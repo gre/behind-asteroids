@@ -1,15 +1,13 @@
 // Constants
 var ctx = c.getContext("2d"),
   raf = requestAnimationFrame,
-  GAME_MARGIN = 60,
+  GAME_MARGIN = 120,
+  GAME_INC_PADDING = 50,
   W = c.width - 2 * GAME_MARGIN,
   H = c.height - 2 * GAME_MARGIN,
-  borderLength = 2*(W+H+2*GAME_MARGIN);
+  borderLength = 2*(W+H+2*GAME_INC_PADDING);
 
 ctx.globalAlpha = 0.5;
-ctx.font = "normal 12px sans-serif";
-ctx.textAlign = "center";
-ctx.textBaseline = "middle";
 
 ctx.fillStyle =
 ctx.strokeStyle = "#fff";
@@ -18,37 +16,79 @@ var t, dt;
 
 // GAME STATE
 var spaceship = [ W/2, H/2, 0, 0 ]; // [x, y, rot, vel]
-var asteroids = []; // array of [x, y, rot, vel, size, shape]
+var asteroids = []; // array of [x, y, rot, vel, shape, lvl]
 var aliens = []; // array of [x, y, rot, vel]
 var bullets = []; // array of [x, y, rot, vel, life, isAlien]
 
-var incomingObjects = []; // array of: [pos, vel, ang, force, key]
+var incomingObjects = []; // array of: [pos, vel, ang, force, rotVel, shape, lvl, key]
 
 var particles = []; // array of [x, y, rot, vel, life]
 
 var dying = 0;
+var resurrectionTime = 0;
+var deads = 0;
 
-// TMP data
+var probabilityCreateInc = 1;
 
-setInterval(function () {
-  var left = Math.random() < 0.5;
-  asteroids.push([
-    left ? 0 : Math.random()*W,
-    !left ? 0 : Math.random()*H,
-    7*Math.random(), 0.08 * (0.6 + 0.4 * Math.random()),
-    randomAsteroidShape(2), 2
-  ]);
-}, 200);
+// user inputs
+var keys = {};
 
-incomingObjects.push([ 0, 0.1, 0, 0.1, randomAsteroidShape(2), 65 ]);
-incomingObjects.push([ 200, 0.1, 0, 0.1, randomAsteroidShape(2), 66 ]);
-incomingObjects.push([ 400, 0.1, 0, 0.1, randomAsteroidShape(2), 67 ]);
-incomingObjects.push([ 600, 0.1, 0, 0.1, randomAsteroidShape(2),68 ]);
-incomingObjects.push([ 800, 0.1, 0, 0.1, randomAsteroidShape(2), 69 ]);
-incomingObjects.push([ 1000, 0.1, 0, 0.1, randomAsteroidShape(2), 70 ]);
+for (var i=0; i<99; ++i) keys[i] = 0;
+document.addEventListener("keydown", function (e) {
+  keys[e.which] = 1;
+});
+document.addEventListener("keyup", function (e) {
+  keys[e.which] = 0;
+});
 
+// game actions
 
-// game primitives constructor
+function maybeCreateInc () {
+  if (Math.random() > probabilityCreateInc) return;
+  return createInc();
+}
+
+function sendAsteroid (o) {
+  var p = incPosition(o);
+  var x = Math.max(0, Math.min(p[0], W));
+  var y = Math.max(0, Math.min(p[1], H));
+  var rot = o[2];
+  var vel = 0.005 * o[3] * (0.5 + 0.5 * Math.random());
+  var lvl = o[6];
+  var shape = randomAsteroidShape(lvl);
+  asteroids.push([ x, y, rot, vel, shape, lvl ]);
+  var incr = Math.max(0, 0.003 * o[3] * Math.exp(-incomingObjects.length/3));
+  probabilityCreateInc += incr;
+}
+
+function createInc () {
+  var pos = Math.random() * borderLength;
+  var takenKeys = [], i;
+  for (i=0; i<incomingObjects.length; ++i) {
+    var o = incomingObjects[i];
+    if (pos - 60 < o[0] && o[0] < pos + 60) return 0;
+    takenKeys.push(o[7]);
+  }
+  var availableKeys = [];
+  for (i = 65; i<91; i++) {
+    if (takenKeys.indexOf(i) === -1)
+      availableKeys.push(i);
+  }
+  if (!availableKeys.length) return 0;
+
+  var vel = 0.1;
+  var ang = 0;
+  var force = 0;
+  var lvl = Math.floor(2 + 2 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
+  var rotVel = 0.001 * (Math.random() - 0.5) * (1 + Math.random() * Math.random() + lvl * Math.random());
+  var shape = randomAsteroidShape(lvl);
+  var key = availableKeys[Math.floor(Math.random() * availableKeys.length)];
+
+  probabilityCreateInc *= 0.9 / lvl;
+
+  incomingObjects.push([ pos, vel, ang, force, rotVel, shape, lvl, key ]);
+  return 1;
+}
 
 function randomAsteroidShape (lvl) {
   var n = 4 + lvl * 2;
@@ -68,15 +108,35 @@ function randomAsteroidShape (lvl) {
 function explose (o) {
   var n = Math.floor(8 + 4 * Math.random());
   for (var i = 0; i < n; ++i) {
-    var l = 2 * (0.5 + 0.5*Math.random());
+    var l = 10 * Math.random();
     var a = (Math.random() + 2 * Math.PI * i) / n;
     particles.push([
       o[0] + l * Math.cos(a),
       o[1] + l * Math.sin(a),
       a,
       0.04,
-      16
+      20 + 10 * Math.random()
     ]);
+  }
+}
+
+function explodeAsteroid (j) {
+  var aster = asteroids[j];
+  asteroids.splice(j, 1);
+  var lvl = aster[5];
+  if (lvl > 1) {
+    var nb = Math.round(2+1.5*Math.random());
+    for (var k=0; k<nb; k++) {
+      var a = Math.random() + 2 * Math.PI * k / nb;
+      asteroids.push([
+        aster[0] + 10 * Math.cos(a),
+        aster[1] + 10 * Math.sin(a),
+        a,
+        0.8 * aster[3],
+        randomAsteroidShape(lvl-1),
+        lvl - 1
+      ]);
+    }
   }
 }
 
@@ -89,14 +149,17 @@ function euclidPhysics (obj) {
 }
 */
 
-function strokePath (pts) {
+function path (pts, noclose) {
   ctx.beginPath();
   for (var i = 0; i<pts.length; ++i) {
     var p = pts[i];
     if (i==0) ctx.moveTo(p[0], p[1]);
     else ctx.lineTo(p[0], p[1]);
   }
-  ctx.closePath();
+  if (!noclose) ctx.closePath();
+}
+function strokePath (pts, noclose) {
+  path(pts, noclose);
   ctx.stroke();
 }
 
@@ -149,22 +212,46 @@ function circleCollides (a, b, r) {
 function spaceshipDie() {
   if (dying) return;
   dying = t;
+  deads ++;
 }
 
 function resetSpaceship () {
-  spaceship = [W/2, H/2, 0, 0];
+  var x = W * (0.25 + 0.5 * Math.random());
+  var y = H * (0.25 + 0.5 * Math.random());
+  spaceship = [x, y, 0, 0];
+}
+
+function applyIncLogic (o) {
+  o[2] += o[4] * dt;
+  o[3] = o[3] < 5 ? 20 + 50 * Math.random() : o[3] * (1 - 0.001 * dt);
 }
 
 // AI inputs
 var AIshoot = 0, AIboost = 0, AIrotate = 0;
 
 function update () {
-
   var nbSpaceshipBullets = 0;
+
+  // inc lifecycle
+
+  for (var i = 0; i < incomingObjects.length;) {
+    var o = incomingObjects[i];
+    if (keys[o[7]]) {
+      // send an asteroid
+      sendAsteroid(o);
+      incomingObjects.splice(i, 1);
+    }
+    else i++;
+  }
+
+  while(maybeCreateInc());
+
+  // spaceship lifecycle
 
   if (dying && t-dying > 2000) {
     dying = 0;
     resetSpaceship();
+    resurrectionTime = t;
   }
 
   // collision
@@ -194,30 +281,21 @@ function update () {
       if (circleCollides(bull, aster, 10 * lvl)) {
         explose(bull);
         bullets.splice(i, 1);
-        asteroids.splice(j, 1);
-        if (lvl > 1) {
-          var nb = Math.round(2+1.5*Math.random());
-          for (var k=0; k<nb; k++) {
-            var a = Math.random() + 2 * Math.PI * k / nb;
-            asteroids.push([
-              aster[0] + 10 * Math.cos(a),
-              aster[1] + 10 * Math.sin(a),
-              a,
-              0.8 * aster[3],
-              randomAsteroidShape(lvl-1),
-              lvl - 1
-            ]);
-          }
-        }
+        explodeAsteroid(j);
         return;
       }
     }
   });
 
-  if (!dying) asteroids.forEach(function (aster) {
+  if (!dying) asteroids.forEach(function (aster, j) {
     if (circleCollides(aster, spaceship, 10 + 10 * aster[5])) {
-      explose(spaceship);
-      spaceshipDie();
+      if (t - resurrectionTime < 1000) {
+        explodeAsteroid(j);
+      }
+      else {
+        explose(spaceship);
+        spaceshipDie();
+      }
     }
   });
 
@@ -233,6 +311,8 @@ function update () {
       AIboost = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? -1 : 1;
 
 
+    AIboost = 0;
+
     // apply ai inputs with game logic
 
     spaceship[3] += AIboost * dt * 0.0002;
@@ -241,7 +321,7 @@ function update () {
       if (AIshoot) {
         var x = spaceship[0] + 14 * Math.cos(spaceship[2]);
         var y = spaceship[1] + 14 * Math.sin(spaceship[2]);
-        bullets.push([ x, y, spaceship[2], 0.2, 300, 0 ]);
+        bullets.push([ x, y, spaceship[2], spaceship[3] + 0.3, 300, 0 ]);
       }
     }
   }
@@ -253,6 +333,8 @@ function update () {
   bullets.forEach(polarPhysics);
   particles.forEach(polarPhysics);
   incomingObjects.forEach(incomingPhysics);
+
+  incomingObjects.forEach(applyIncLogic);
 
   // after physics logic
   particles.forEach(applyLife);
@@ -268,8 +350,8 @@ function update () {
 function incPosition (o) {
   var p = o[0];
   var x, y;
-  var w = W + GAME_MARGIN;
-  var h = H + GAME_MARGIN;
+  var w = W + GAME_INC_PADDING;
+  var h = H + GAME_INC_PADDING;
   if (p<w) {
     x = p;
     y = 0;
@@ -293,14 +375,14 @@ function incPosition (o) {
       }
     }
   }
-  return [ -GAME_MARGIN/2 + x, -GAME_MARGIN/2 + y ];
+  return [ -GAME_INC_PADDING/2 + x, -GAME_INC_PADDING/2 + y ];
 }
 
 function drawBg () {
   ctx.globalAlpha = 1;
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, c.width, c.height);
-  ctx.fillStyle = "#222";
+  ctx.fillStyle = "#1a1a1a";
   ctx.fillRect(GAME_MARGIN, GAME_MARGIN, W, H);
 }
 
@@ -367,21 +449,54 @@ function drawBullet () {
 }
 
 function drawInc (o) {
-  var pts = o[4];
+  var pts = o[5];
   ctx.globalAlpha = 1;
-  strokePath(pts);
+
+  ctx.lineWidth = o[3] > 20 ? 2 : 1;
+
+  save();
+  ctx.rotate(o[2]);
+  var x = o[3] + 10 * o[6];
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(x, 0);
+  ctx.stroke();
+  var r = o[3]/6;
+  strokePath([
+    [ x - r, r ],
+    [x, 0],
+    [ x - r, -r ]
+  ], 1);
+  restore();
+
+  save();
+  path(pts);
+  ctx.fillStyle = "#000";
+  ctx.fill();
+  ctx.stroke();
+  restore();
+
   var sum = [0, 0];
   pts.forEach(function (p) {
     sum[0] += p[0];
     sum[1] += p[1];
   });
-  ctx.fillText(String.fromCharCode(o[5]), sum[0]/pts.length, sum[1]/pts.length);
+
+  ctx.font = "normal 12px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String.fromCharCode(o[7]), sum[0]/pts.length, sum[1]/pts.length);
 }
 
 function drawParticle (o) {
   ctx.rotate(o[2]);
   ctx.globalAlpha = 0.3;
   strokePath([ [0, 0], [4, 0] ]);
+}
+
+function drawUI () {
+  ctx.font = "normal 16px sans-serif";
+  ctx.fillText((deads*25)+" ¢", 10, 20);
 }
 
 
@@ -425,6 +540,10 @@ function render (_t) {
   drawBg();
   restore();
 
+  save();
+  drawUI();
+  restore();
+
   ctx.translate(GAME_MARGIN, GAME_MARGIN);
 
   incomingObjects.forEach(function (inc) {
@@ -447,7 +566,6 @@ function render (_t) {
   translateTo(spaceship);
   drawSpaceship(spaceship);
   restore();
-
   restore();
 }
 
