@@ -1,5 +1,5 @@
 // Constants
-var ctx = c.getContext("2d"),
+var tmpCtx = c.getContext("2d"),
   raf = requestAnimationFrame,
   GAME_MARGIN = 120,
   GAME_INC_PADDING = 50,
@@ -7,17 +7,36 @@ var ctx = c.getContext("2d"),
   H = c.height - 2 * GAME_MARGIN,
   borderLength = 2*(W+H+2*GAME_INC_PADDING);
 
-ctx.globalAlpha = 0.5;
+// Temporary external libs
+var createFBO = require("gl-fbo"),
+  createTexture = require("gl-texture2d"),
+  createShader = require("gl-shader");
 
-ctx.fillStyle =
-ctx.strokeStyle = "#fff";
+var gameCanvas = document.createElement("canvas");
+gameCanvas.width = W;
+gameCanvas.height = H;
+var gameCtx = gameCanvas.getContext("2d");
+
+var uiCanvas = document.createElement("canvas");
+uiCanvas.width = c.width;
+uiCanvas.height = c.height;
+var uiCtx = uiCanvas.getContext("2d");
+
+var ctx;
+
+gameCtx.globalAlpha = 0.5;
+
+uiCtx.fillStyle =
+uiCtx.strokeStyle =
+gameCtx.fillStyle =
+gameCtx.strokeStyle = "#fff";
 
 var t, dt;
 
 // GAME STATE
 var spaceship = [ W/2, H/2, 0, 0 ]; // [x, y, rot, vel]
 var asteroids = []; // array of [x, y, rot, vel, shape, lvl]
-var aliens = []; // array of [x, y, rot, vel]
+// var aliens = []; // array of [x, y, rot, vel]
 var bullets = []; // array of [x, y, rot, vel, life, isAlien]
 
 var incomingObjects = []; // array of: [pos, vel, ang, force, rotVel, shape, lvl, key]
@@ -266,6 +285,7 @@ function update () {
       spaceshipDie();
       return;
     }
+    /*
     for (j = 0; j < aliens.length; ++j) {
       var alien = aliens[j];
       if (circleCollides(bull, alien, 20)) {
@@ -275,6 +295,8 @@ function update () {
         return;
       }
     }
+    */
+
     for (j = 0; j < asteroids.length; ++j) {
       var aster = asteroids[j];
       var lvl = aster[5];
@@ -329,7 +351,7 @@ function update () {
   // apply physics
   polarPhysics(spaceship);
   asteroids.forEach(polarPhysics);
-  aliens.forEach(polarPhysics);
+  //aliens.forEach(polarPhysics);
   bullets.forEach(polarPhysics);
   particles.forEach(polarPhysics);
   incomingObjects.forEach(incomingPhysics);
@@ -340,7 +362,7 @@ function update () {
   particles.forEach(applyLife);
   loopOutOfBox(spaceship);
   asteroids.forEach(destroyOutOfBox);
-  aliens.forEach(loopOutOfBox);
+  //aliens.forEach(loopOutOfBox);
   bullets.forEach(applyLife);
   bullets.forEach(loopOutOfBox);
 }
@@ -437,10 +459,14 @@ function drawAsteroid (o) {
   ctx.fillStyle = "#aaa";
   strokePath(o[4]);
 }
+
+/*
 function drawAlien () {
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, 22, 16);
 }
+*/
+
 function drawBullet () {
   ctx.beginPath();
   ctx.globalAlpha = 1;
@@ -534,15 +560,16 @@ function render (_t) {
 
   update();
 
-  save();
+  ctx = uiCtx;
 
   save();
-  drawBg();
-  restore();
+
 
   save();
+
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
   drawUI();
-  restore();
 
   ctx.translate(GAME_MARGIN, GAME_MARGIN);
 
@@ -553,12 +580,18 @@ function render (_t) {
     restore();
   });
 
-  ctx.beginPath();
-  ctx.rect(0, 0, W, H);
-  ctx.clip();
+  restore();
+
+  restore();
+
+  ctx = gameCtx;
+
+  save();
+
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
   renderCollection(asteroids, drawAsteroid);
-  renderCollection(aliens, drawAlien);
+  //renderCollection(aliens, drawAlien);
   renderCollection(bullets, drawBullet);
   renderCollection(particles, drawParticle);
 
@@ -566,6 +599,15 @@ function render (_t) {
   translateTo(spaceship);
   drawSpaceship(spaceship);
   restore();
+  restore();
+
+  ctx = tmpCtx;
+  save();
+  save();
+  drawBg();
+  restore();
+  ctx.drawImage(gameCanvas, GAME_MARGIN, GAME_MARGIN);
+  ctx.drawImage(uiCanvas, 0, 0);
   restore();
 }
 
