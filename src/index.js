@@ -136,10 +136,10 @@ function maybeCreateInc () {
   var sum = incomingObjects.reduce(function (sum, o) {
     return o[6];
   }, 0);
-  var probabilityCreateInc = dt * 0.001 *
+  var probabilityCreateInc = dt * 0.02 *
     Math.exp(-sum) *
-    (0.1 + (1 - Math.exp(-playingSince / 60000)));
-  if (Math.random() > probabilityCreateInc * dt) return;
+    (1.0 - Math.exp(-playingSince / 90000));
+  if (Math.random() > probabilityCreateInc) return;
   return createInc();
 }
 
@@ -335,7 +335,8 @@ function applyIncLogic (o) {
 }
 
 // AI inputs
-var AIshoot = 0, AIboost = 0, AIrotate = 0;
+var AIshoot = 0, AIboost = 0, AIrotate = 0,
+  AIa, AIb, AIc, AId, AIe, AIf; // eslint-disable-line
 
 function update () {
   var nbSpaceshipBullets = 0;
@@ -453,10 +454,14 @@ function update () {
     AIshoot = Math.random() < 0.005*dt;
     if (Math.random() < 0.01*dt)
       AIrotate = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? -1 : 1;
-    if (Math.random() < 0.01*dt)
-      AIboost = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? -1 : 1;
 
     AIboost = 0;
+
+    if (!AIa) {
+      AIa = 1;
+      AIboost = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? -1 : 1;
+    }
+    AIa = Math.random() < 0.0001 * dt;
 
     // apply ai inputs with game logic
 
@@ -636,9 +641,11 @@ function drawInc (o) {
 
   save();
   path(pts);
-  //ctx.fillStyle = "#000";
   ctx.fill();
-  //ctx.stroke();
+  /*
+  ctx.strokeStyle = "#000";
+  ctx.stroke();
+  */
   restore();
 
   var sum = [0, 0];
@@ -647,7 +654,7 @@ function drawInc (o) {
     sum[1] += p[1];
   });
 
-  ctx.font = "bold 14px sans-serif";
+  ctx.font = "bold 16px sans-serif";
   ctx.fillStyle = "#000";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
