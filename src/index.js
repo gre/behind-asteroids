@@ -110,7 +110,6 @@ var particles = []; // array of [x, y, rot, vel, life]
 
 var dying = 0;
 var resurrectionTime = 0;
-var probabilityCreateInc = 0.01;
 
 var best = 0;
 var score = 0;
@@ -134,6 +133,12 @@ document.addEventListener("keyup", function (e) {
 // game actions
 
 function maybeCreateInc () {
+  var sum = incomingObjects.reduce(function (sum, o) {
+    return o[6];
+  }, 0);
+  var probabilityCreateInc = dt * 0.001 *
+    Math.exp(-sum) *
+    (0.1 + (1 - Math.exp(-playingSince / 60000)));
   if (Math.random() > probabilityCreateInc * dt) return;
   return createInc();
 }
@@ -147,8 +152,6 @@ function sendAsteroid (o) {
   var lvl = o[6];
   var shape = o[5];
   asteroids.push([ x, y, rot, vel, shape, lvl ]);
-  var incr = Math.max(0, 0.001 * o[3] * Math.exp(-incomingObjects.length/8));
-  probabilityCreateInc += incr;
 }
 
 /*
@@ -180,11 +183,9 @@ function createInc () {
   var ang = 2*Math.PI*Math.random();
   var force = 30*Math.random();
   var lvl = Math.floor(2 + 2 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
-  var rotVel = 0.002 * (0.1 + Math.random() * Math.random() + lvl * Math.random());
+  var rotVel = 0.002 * (1 + lvl * Math.random() * Math.random());
   var shape = randomAsteroidShape(lvl);
   var key = availableKeys[Math.floor(Math.random() * availableKeys.length)];
-
-  probabilityCreateInc *= 0.6 / lvl;
 
   incomingObjects.push([ pos, vel, ang, force, rotVel, shape, lvl, key ]);
   return 1;
@@ -370,7 +371,6 @@ function update () {
 
   if (dying && t-dying > 2000) {
     dying = 0;
-    probabilityCreateInc = 1;
     spaceship = [ W/2, H/2, 0, 0 ];
     if (--lifes) {
       resurrectionTime = t;
@@ -527,7 +527,7 @@ function incPosition (o) {
 function incRotation (o) {
   var p = incPosition(o);
   var toCenter = Math.atan2(H/2 - p[1], W/2 - p[0]);
-  return Math.cos(o[2]) * Math.PI / 4 + toCenter;
+  return Math.cos(o[2]) * Math.PI / 3 + toCenter;
   //return o[2];
 }
 
@@ -605,13 +605,13 @@ function drawParticle (o) {
 
 function drawInc (o) {
   var rot = incRotation(o);
-  var aim = o[3] < 30;
 
   ctx.fillStyle =
-  ctx.strokeStyle = "rgba(250, 130, 180,"+(0.6 + 0.4 * aim)+")";
+  ctx.strokeStyle = "#9af";
   var pts = o[5];
 
   save();
+  ctx.globalAlpha = 0.4 + 0.6 * o[3] / 60;
   ctx.rotate(rot);
   var mx = 60 + 10 * o[6];
   var x = o[3] + 10 * o[6];
@@ -626,7 +626,7 @@ function drawInc (o) {
   ctx.moveTo(0, 0);
   ctx.lineTo(x, 0);
   ctx.stroke();
-  var r = 10;
+  var r = 6;
   strokePath([
     [ mx - r, r ],
     [ mx, 0],
@@ -636,9 +636,9 @@ function drawInc (o) {
 
   save();
   path(pts);
-  ctx.fillStyle = "#000";
+  //ctx.fillStyle = "#000";
   ctx.fill();
-  ctx.stroke();
+  //ctx.stroke();
   restore();
 
   var sum = [0, 0];
@@ -647,7 +647,8 @@ function drawInc (o) {
     sum[1] += p[1];
   });
 
-  ctx.font = "normal 12px sans-serif";
+  ctx.font = "bold 14px sans-serif";
+  ctx.fillStyle = "#000";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(String.fromCharCode(o[7]), sum[0]/pts.length, sum[1]/pts.length);
@@ -748,7 +749,6 @@ function drawGameUI () {
   save();
   ctx.fillStyle = ctx.strokeStyle = "#fff";
   ctx.globalAlpha = 0.3;
-  ctx.font = "normal 16px sans-serif";
 
   save();
   ctx.translate(W/2, 30);
