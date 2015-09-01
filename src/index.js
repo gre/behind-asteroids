@@ -1,16 +1,26 @@
+var FW = 800;
+var FH = 680;
+c.width = FW;
+c.height = FH;
+c.style.width = FW+"px";
+c.style.height = FH+"px";
+
+var SEED = Math.random();
+
 // Constants
-var tmpCtx = c.getContext("2d"),
+var gl = c.getContext("webgl"),
   raf = requestAnimationFrame,
   GAME_MARGIN = 120,
-  GAME_INC_PADDING = 50,
+  GAME_INC_PADDING = 80,
   W = c.width - 2 * GAME_MARGIN,
   H = c.height - 2 * GAME_MARGIN,
   borderLength = 2*(W+H+2*GAME_INC_PADDING);
 
 // Temporary external libs
-var createFBO = require("gl-fbo"),
-  createTexture = require("gl-texture2d"),
-  createShader = require("gl-shader");
+var createFBO = require("gl-fbo");
+var createTexture = require("gl-texture2d");
+var createShader = require("gl-shader");
+var glslify = require("glslify");
 
 var gameCanvas = document.createElement("canvas");
 gameCanvas.width = W;
@@ -24,12 +34,67 @@ var uiCtx = uiCanvas.getContext("2d");
 
 var ctx;
 
-gameCtx.globalAlpha = 0.5;
+gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-uiCtx.fillStyle =
-uiCtx.strokeStyle =
-gameCtx.fillStyle =
-gameCtx.strokeStyle = "#fff";
+var buffer = gl.createBuffer();
+
+gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+  -1.0, -1.0,
+  1.0, -1.0,
+  -1.0,  1.0,
+  -1.0,  1.0,
+  1.0, -1.0,
+  1.0,  1.0
+]), gl.STATIC_DRAW);
+
+var mainShader = createShader(gl, glslify(__dirname+"/main.vert"), glslify(__dirname+"/main.frag"));
+mainShader.bind();
+
+mainShader.attributes.p.pointer();
+mainShader.uniforms.dim = [ W, H ];
+mainShader.uniforms.game_margin = GAME_MARGIN;
+
+var blur1dShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/blur1d.frag"));
+blur1dShader.bind();
+
+blur1dShader.attributes.p.pointer();
+
+var copyShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/copy.frag"));
+copyShader.bind();
+
+copyShader.attributes.p.pointer();
+
+var glareShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/glare.frag"));
+glareShader.bind();
+
+glareShader.attributes.p.pointer();
+
+var playerShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/player.frag"));
+playerShader.bind();
+
+playerShader.attributes.p.pointer();
+
+var gameShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/game.frag"));
+gameShader.bind();
+
+gameShader.attributes.p.pointer();
+
+var gameFbo = createFBO(gl, [W, H]);
+var persistenceFbo = createFBO(gl, [W, H]);
+var playerFbo = createFBO(gl, [W, H]);
+var glareFbo = createFBO(gl, [W, H]);
+
+var fbo1 = createFBO(gl, [W, H]);
+var fbo2 = createFBO(gl, [W, H]);
+
+var textureGame = createTexture(gl, gameCanvas);
+var textureUI = createTexture(gl, uiCanvas);
+
+textureUI.minFilter =
+textureUI.magFilter =
+textureGame.minFilter =
+textureGame.magFilter = gl.LINEAR;
 
 var t, dt;
 
@@ -45,9 +110,15 @@ var particles = []; // array of [x, y, rot, vel, life]
 
 var dying = 0;
 var resurrectionTime = 0;
-var deads = 0;
+var probabilityCreateInc = 0.01;
 
-var probabilityCreateInc = 1;
+var best = 0;
+var score = 0;
+var scoreForLife = 0;
+var playingSince = -5000;
+var deads = 0;
+var player = 0;
+var lifes = 0;
 
 // user inputs
 var keys = {};
@@ -63,22 +134,32 @@ document.addEventListener("keyup", function (e) {
 // game actions
 
 function maybeCreateInc () {
-  if (Math.random() > probabilityCreateInc) return;
+  if (Math.random() > probabilityCreateInc * dt) return;
   return createInc();
 }
 
 function sendAsteroid (o) {
   var p = incPosition(o);
+  var rot = incRotation(o);
   var x = Math.max(0, Math.min(p[0], W));
   var y = Math.max(0, Math.min(p[1], H));
-  var rot = o[2];
   var vel = 0.005 * o[3] * (0.5 + 0.5 * Math.random());
   var lvl = o[6];
-  var shape = randomAsteroidShape(lvl);
+  var shape = o[5];
   asteroids.push([ x, y, rot, vel, shape, lvl ]);
-  var incr = Math.max(0, 0.003 * o[3] * Math.exp(-incomingObjects.length/3));
+  var incr = Math.max(0, 0.001 * o[3] * Math.exp(-incomingObjects.length/8));
   probabilityCreateInc += incr;
 }
+
+/*
+setTimeout(function () {
+  setInterval(function () {
+    createInc();
+    if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
+    incomingObjects.splice(0, 1);
+  }, 100);
+}, 5000);
+*/
 
 function createInc () {
   var pos = Math.random() * borderLength;
@@ -96,14 +177,14 @@ function createInc () {
   if (!availableKeys.length) return 0;
 
   var vel = 0.1;
-  var ang = 0;
-  var force = 0;
+  var ang = 2*Math.PI*Math.random();
+  var force = 30*Math.random();
   var lvl = Math.floor(2 + 2 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
-  var rotVel = 0.001 * (Math.random() - 0.5) * (1 + Math.random() * Math.random() + lvl * Math.random());
+  var rotVel = 0.002 * (0.1 + Math.random() * Math.random() + lvl * Math.random());
   var shape = randomAsteroidShape(lvl);
   var key = availableKeys[Math.floor(Math.random() * availableKeys.length)];
 
-  probabilityCreateInc *= 0.9 / lvl;
+  probabilityCreateInc *= 0.6 / lvl;
 
   incomingObjects.push([ pos, vel, ang, force, rotVel, shape, lvl, key ]);
   return 1;
@@ -125,16 +206,16 @@ function randomAsteroidShape (lvl) {
 }
 
 function explose (o) {
-  var n = Math.floor(8 + 4 * Math.random());
+  var n = Math.floor(9 + 9 * Math.random());
   for (var i = 0; i < n; ++i) {
-    var l = 10 * Math.random();
+    var l = 20 * Math.random();
     var a = (Math.random() + 2 * Math.PI * i) / n;
     particles.push([
       o[0] + l * Math.cos(a),
       o[1] + l * Math.sin(a),
       a,
-      0.04,
-      20 + 10 * Math.random()
+      0.06,
+      30 + 10 * Math.random()
     ]);
   }
 }
@@ -170,10 +251,15 @@ function euclidPhysics (obj) {
 
 function path (pts, noclose) {
   ctx.beginPath();
+  var mv = 1;
   for (var i = 0; i<pts.length; ++i) {
     var p = pts[i];
-    if (i==0) ctx.moveTo(p[0], p[1]);
-    else ctx.lineTo(p[0], p[1]);
+    if (p) {
+      if (mv) ctx.moveTo(p[0], p[1]);
+      else ctx.lineTo(p[0], p[1]);
+      mv = 0;
+    }
+    else mv = 1;
   }
   if (!noclose) ctx.closePath();
 }
@@ -234,15 +320,17 @@ function spaceshipDie() {
   deads ++;
 }
 
+/*
 function resetSpaceship () {
   var x = W * (0.25 + 0.5 * Math.random());
   var y = H * (0.25 + 0.5 * Math.random());
   spaceship = [x, y, 0, 0];
 }
+*/
 
 function applyIncLogic (o) {
   o[2] += o[4] * dt;
-  o[3] = o[3] < 5 ? 20 + 50 * Math.random() : o[3] * (1 - 0.001 * dt);
+  o[3] = o[3] < 10 ? 60 : o[3] * (1 - 0.0008 * dt);
 }
 
 // AI inputs
@@ -250,6 +338,19 @@ var AIshoot = 0, AIboost = 0, AIrotate = 0;
 
 function update () {
   var nbSpaceshipBullets = 0;
+
+  // player lifecycle
+
+  playingSince += dt;
+
+  if (lifes === 0 && playingSince > 0) {
+    // player enter
+    resurrectionTime = t;
+    lifes = 4;
+    player ++;
+    score = 0;
+    scoreForLife = 0;
+  }
 
   // inc lifecycle
 
@@ -269,22 +370,33 @@ function update () {
 
   if (dying && t-dying > 2000) {
     dying = 0;
-    resetSpaceship();
-    resurrectionTime = t;
+    probabilityCreateInc = 1;
+    spaceship = [ W/2, H/2, 0, 0 ];
+    if (--lifes) {
+      resurrectionTime = t;
+    }
+    else {
+      // Player lost. game over
+      playingSince = -5000;
+    }
   }
 
   // collision
 
   bullets.forEach(function (bull, i) {
     if (!bull[5]) nbSpaceshipBullets ++;
-
     var j;
+
+    /*
+    // bullet-spaceship collision
     if (!dying && bull[4]<270 && circleCollides(bull, spaceship, 20)) {
       explose(bull);
       bullets.splice(i, 1);
       spaceshipDie();
       return;
     }
+    */
+
     /*
     for (j = 0; j < aliens.length; ++j) {
       var alien = aliens[j];
@@ -300,21 +412,33 @@ function update () {
     for (j = 0; j < asteroids.length; ++j) {
       var aster = asteroids[j];
       var lvl = aster[5];
+      // bullet-asteroid collision
       if (circleCollides(bull, aster, 10 * lvl)) {
         explose(bull);
         bullets.splice(i, 1);
         explodeAsteroid(j);
+        var s = 10 * Math.floor(0.4 * (6 - lvl) * (6 - lvl));
+        score += s;
+        scoreForLife += s;
+        if (scoreForLife > 10000) {
+          lifes ++;
+          scoreForLife = 0;
+        }
+        best = Math.max(best, score);
         return;
       }
     }
   });
 
-  if (!dying) asteroids.forEach(function (aster, j) {
+  if (!dying && playingSince > 0) asteroids.forEach(function (aster, j) {
+    // asteroid-spaceship collision
     if (circleCollides(aster, spaceship, 10 + 10 * aster[5])) {
       if (t - resurrectionTime < 1000) {
+        // if spaceship just resurect, will explode the asteroid
         explodeAsteroid(j);
       }
       else {
+        // otherwise, player die
         explose(spaceship);
         spaceshipDie();
       }
@@ -322,7 +446,7 @@ function update () {
   });
 
   // run spaceship AI
-  if (!dying) {
+  if (!dying && playingSince > 0) {
 
     // ai logic (determine the 3 inputs)
 
@@ -332,14 +456,13 @@ function update () {
     if (Math.random() < 0.01*dt)
       AIboost = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? -1 : 1;
 
-
     AIboost = 0;
 
     // apply ai inputs with game logic
 
     spaceship[3] += AIboost * dt * 0.0002;
     spaceship[2] += AIrotate * dt * 0.005;
-    if (nbSpaceshipBullets < 3) {
+    if (nbSpaceshipBullets < 4) {
       if (AIshoot) {
         var x = spaceship[0] + 14 * Math.cos(spaceship[2]);
         var y = spaceship[1] + 14 * Math.sin(spaceship[2]);
@@ -370,6 +493,7 @@ function update () {
 // Game DRAWING
 
 function incPosition (o) {
+  ctx.fillStyle = "#fff";
   var p = o[0];
   var x, y;
   var w = W + GAME_INC_PADDING;
@@ -400,18 +524,19 @@ function incPosition (o) {
   return [ -GAME_INC_PADDING/2 + x, -GAME_INC_PADDING/2 + y ];
 }
 
-function drawBg () {
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, c.width, c.height);
-  ctx.fillStyle = "#1a1a1a";
-  ctx.fillRect(GAME_MARGIN, GAME_MARGIN, W, H);
+function incRotation (o) {
+  var p = incPosition(o);
+  var toCenter = Math.atan2(H/2 - p[1], W/2 - p[0]);
+  return Math.cos(o[2]) * Math.PI / 4 + toCenter;
+  //return o[2];
 }
 
 function drawSpaceship (o) {
+  ctx.strokeStyle = "#fff";
+  ctx.globalAlpha = 0.4;
   ctx.rotate(o[2]);
-  ctx.globalAlpha = 0.8;
   if (dying) {
+    ctx.lineWidth = 2;
     var delta = (t-dying)/200;
 
     strokePath([
@@ -456,42 +581,56 @@ function drawSpaceship (o) {
 }
 
 function drawAsteroid (o) {
-  ctx.fillStyle = "#aaa";
+  ctx.strokeStyle = "#fff";
+  ctx.globalAlpha = 0.2;
   strokePath(o[4]);
 }
 
-/*
-function drawAlien () {
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, 22, 16);
-}
-*/
-
 function drawBullet () {
+  ctx.fillStyle = "#fff";
   ctx.beginPath();
   ctx.globalAlpha = 1;
   ctx.arc(0, 0, 3, 0, 2*Math.PI);
   ctx.fill();
 }
 
-function drawInc (o) {
-  var pts = o[5];
-  ctx.globalAlpha = 1;
+function drawParticle (o) {
+  ctx.strokeStyle = "#fff";
+  ctx.rotate(o[2]);
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.arc(0, 0, 1, 0, 2*Math.PI);
+  ctx.fill();
+}
 
-  ctx.lineWidth = o[3] > 20 ? 2 : 1;
+function drawInc (o) {
+  var rot = incRotation(o);
+  var aim = o[3] < 30;
+
+  ctx.fillStyle =
+  ctx.strokeStyle = "rgba(250, 130, 180,"+(0.6 + 0.4 * aim)+")";
+  var pts = o[5];
 
   save();
-  ctx.rotate(o[2]);
+  ctx.rotate(rot);
+  var mx = 60 + 10 * o[6];
   var x = o[3] + 10 * o[6];
+  /*
   ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(mx, 0);
+  ctx.stroke();
+  */
+  ctx.beginPath();
+  ctx.lineWidth = 2;
   ctx.moveTo(0, 0);
   ctx.lineTo(x, 0);
   ctx.stroke();
-  var r = o[3]/6;
+  var r = 10;
   strokePath([
-    [ x - r, r ],
-    [x, 0],
-    [ x - r, -r ]
+    [ mx - r, r ],
+    [ mx, 0],
+    [ mx - r, -r ]
   ], 1);
   restore();
 
@@ -514,17 +653,127 @@ function drawInc (o) {
   ctx.fillText(String.fromCharCode(o[7]), sum[0]/pts.length, sum[1]/pts.length);
 }
 
-function drawParticle (o) {
-  ctx.rotate(o[2]);
-  ctx.globalAlpha = 0.3;
-  strokePath([ [0, 0], [4, 0] ]);
-}
-
 function drawUI () {
+  ctx.fillStyle = "#9af";
   ctx.font = "normal 16px sans-serif";
-  ctx.fillText((deads*25)+" ¢", 10, 20);
+  ctx.fillText((player*25)+" ¢", 10, 20);
 }
 
+// only support digits
+function font (txt, s) {
+  var x = 4 * s;
+  var y = 5 * s;
+  ctx.translate(-s*11*txt.length/2, 0);
+  for (var i=0; i<txt.length; i++) {
+    strokePath([
+      [ // 0
+        [0, 0],
+        [2*x, 0],
+        [2*x, 2*y],
+        [0, 2*y],
+        [0, 0]
+      ],
+      [ // 1
+        [x, 0],
+        [x, 2*y]
+      ],
+      [ // 2
+        [0, 0],
+        [2*x, 0],
+        [2*x, y],
+        [0, y],
+        [0, 2*y],
+        [2*x, 2*y]
+      ],
+      [ // 3
+        [0, 0],
+        [2*x, 0],
+        [2*x, 2*y],
+        [0, 2*y],
+        ,
+        [0, y],
+        [2*x, y]
+      ],
+      [ // 4
+        [0, 0],
+        [0, y],
+        [2*x, y],
+        ,
+        [2*x, 0],
+        [2*x, 2*y]
+      ],
+      [ // 5
+        [2*x, 0],
+        [0, 0],
+        [0, y],
+        [2*x, y],
+        [2*x, 2*y],
+        [0, 2*y]
+      ],
+      [ // 6
+        [0, 0],
+        [0, 2*y],
+        [2*x, 2*y],
+        [2*x, y],
+        [0, y]
+      ],
+      [ // 7
+        [0, 0],
+        [2*x, 0],
+        [2*x, 2*y]
+      ],
+      [ // 8
+        [0, 0],
+        [2*x, 0],
+        [2*x, 2*y],
+        [0, 2*y],
+        [0, 0],
+        ,
+        [0, y],
+        [2*x, y]
+      ],
+      [ // 9
+        [2*x, 2*y],
+        [2*x, 0],
+        [0, 0],
+        [0, y],
+        [2*x, y]
+      ]
+    ][txt[i]], 1);
+    ctx.translate(s*11, 0);
+  }
+}
+
+function drawGameUI () {
+  save();
+  ctx.fillStyle = ctx.strokeStyle = "#fff";
+  ctx.globalAlpha = 0.3;
+  ctx.font = "normal 16px sans-serif";
+
+  save();
+  ctx.translate(W/2, 30);
+  font(""+best, 1);
+  restore();
+
+  save();
+  ctx.translate(60, 10);
+  font(""+score, 1.5);
+  restore();
+
+  for (var i=1; i<lifes; i++) {
+    save();
+    ctx.translate(80 - i * 10, 40);
+    ctx.rotate(-Math.PI/2);
+    strokePath([
+      [-4, -4],
+      [ 10, 0],
+      [ -4, 4],
+      [ -3, 0]
+    ]);
+    restore();
+  }
+  restore();
+}
 
 // Game Post Effects
 
@@ -554,20 +803,22 @@ var lastT;
 function render (_t) {
   t = _t;
   raf(render);
-  if (!lastT) lastT = t;
+  if (!lastT) {
+    lastT = t;
+  }
   dt = t-lastT;
   lastT = t;
 
   update();
 
+  // UI Rendering
+
   ctx = uiCtx;
 
   save();
 
-
   save();
-
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
 
   drawUI();
 
@@ -584,31 +835,161 @@ function render (_t) {
 
   restore();
 
+  // Game rendering
+
   ctx = gameCtx;
 
   save();
 
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  save();
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
+  restore();
 
   renderCollection(asteroids, drawAsteroid);
   //renderCollection(aliens, drawAlien);
   renderCollection(bullets, drawBullet);
   renderCollection(particles, drawParticle);
 
-  save();
-  translateTo(spaceship);
-  drawSpaceship(spaceship);
-  restore();
+  if (playingSince > 0) {
+    save();
+    translateTo(spaceship);
+    drawSpaceship(spaceship);
+    restore();
+  }
+
+  drawGameUI();
+
   restore();
 
-  ctx = tmpCtx;
-  save();
-  save();
-  drawBg();
-  restore();
-  ctx.drawImage(gameCanvas, GAME_MARGIN, GAME_MARGIN);
-  ctx.drawImage(uiCanvas, 0, 0);
-  restore();
+  // WEBGL after effects
+
+  textureGame.setPixels(gameCanvas);
+  textureUI.setPixels(uiCanvas);
+
+  playerFbo.bind();
+  playerShader.bind();
+  playerShader.uniforms.pt = playingSince / 1000;
+  playerShader.uniforms.pl = player;
+  playerShader.uniforms.seed = SEED;
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  fbo1.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = playerFbo.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 6, 0 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo2.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 0, 2 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo1.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo2.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 2, 1 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  playerFbo.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 2, -1 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  // Glare
+  glareFbo.bind();
+  glareShader.bind();
+  glareShader.uniforms.t = textureGame.bind(0);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo1.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = glareFbo.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 1, -2 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo2.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 1.8, -4 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo1.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo2.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 2.2, -4 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  glareFbo.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 2, -4 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  // Blur
+  fbo1.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = textureGame.bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 1, 0 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo2.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 0, 1 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo1.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo2.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 1, 1 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo2.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 1, -1 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo1.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo2.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 0, 1 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo2.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 1, 0 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  gameFbo.bind();
+  gameShader.bind();
+  gameShader.uniforms.game = textureGame.bind(0);
+  gameShader.uniforms.back = persistenceFbo.color[0].bind(1);
+  gameShader.uniforms.blur = fbo2.color[0].bind(2);
+  gameShader.uniforms.glare = glareFbo.color[0].bind(3);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  persistenceFbo.bind();
+  copyShader.bind();
+  copyShader.uniforms.t = gameFbo.color[0].bind(0);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  mainShader.bind();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, c.width, c.height);
+  mainShader.uniforms.game = persistenceFbo.color[0].bind(0);
+  //mainShader.uniforms.game = textureGame.bind(0);
+  mainShader.uniforms.ui = textureUI.bind(1);
+  mainShader.uniforms.player = playerFbo.color[0].bind(2);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
 raf(render);

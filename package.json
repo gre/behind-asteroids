@@ -15,6 +15,11 @@
     "build-nominify": "npm run cleanall && npm run compileglsl && npm run tmpljs && npm run nominify && npm run gen",
     "watch": "npm run build; wr 'npm run build' src/ assets/"
   },
+  "browserify": {
+    "transform": [
+      "glslify"
+    ]
+  },
   "repository": {
     "type": "git",
     "url": "git://github.com/gre/js13k-2014.git"
@@ -36,6 +41,7 @@
   "dependencies": {
     "gl-fbo": "^2.0.5",
     "gl-shader": "^4.0.5",
-    "gl-texture2d": "^2.0.9"
+    "gl-texture2d": "^2.0.9",
+    "glslify": "^2.2.1"
   }
 }

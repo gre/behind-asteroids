@@ -3,6 +3,7 @@
     "c": 1
   },
   "rules": {
+    "no-sparse-arrays": 0,
     "indent": [
       2,
       2
@@ -21,6 +22,7 @@
     ]
   },
   "env": {
+    "node": true,
     "browser": true
   },
   "extends": "eslint:recommended"
