@@ -96,6 +96,6 @@ void main() {
   // prev player
   c += step (1.0, pl) *
     player(pl+step(pt, 0.0)-1.0, 2.0 *smoothstep(-4., -1., pt));
-  c *= 1.0 - 1.6 * distance(uv, vec2(0.5));
-  gl_FragColor = vec4(light * mix(env(), c.rgb, max(c.a, 1.0)), 1.0);
+  c *= 1.0 - 1.4 * distance(uv, vec2(0.5));
+  gl_FragColor = vec4(light * mix(env(), c.rgb, clamp(c.a, 0.0, 1.0)), 1.0);
 }

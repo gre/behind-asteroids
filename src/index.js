@@ -96,7 +96,7 @@ textureUI.magFilter =
 textureGame.minFilter =
 textureGame.magFilter = gl.LINEAR;
 
-var t, dt;
+var t = 0, dt;
 
 // GAME STATE
 var spaceship = [ W/2, H/2, 0, 0 ]; // [x, y, rot, vel]
@@ -118,6 +118,8 @@ var playingSince = -5000;
 var deads = 0;
 var player = 0;
 var lifes = 0;
+
+randomAsteroids();
 
 // user inputs
 var keys = {};
@@ -152,6 +154,20 @@ function sendAsteroid (o) {
   var lvl = o[6];
   var shape = o[5];
   asteroids.push([ x, y, rot, vel, shape, lvl ]);
+}
+
+function randomAsteroids () {
+  asteroids = [];
+  for (var i=0; i<8; ++i) {
+    asteroids[i] = [
+      W * Math.random(),
+      H * Math.random(),
+      2 * Math.PI * Math.random(),
+      0.02 + 0.02 * Math.random(),
+      randomAsteroidShape(Math.floor(1.5 + 3 * Math.random())),
+      2
+    ];
+  }
 }
 
 /*
@@ -253,7 +269,7 @@ function euclidPhysics (obj) {
 function path (pts, noclose) {
   ctx.beginPath();
   var mv = 1;
-  for (var i = 0; i<pts.length; ++i) {
+  for (var i = 0; pts && i<pts.length; ++i) {
     var p = pts[i];
     if (p) {
       if (mv) ctx.moveTo(p[0], p[1]);
@@ -263,10 +279,6 @@ function path (pts, noclose) {
     else mv = 1;
   }
   if (!noclose) ctx.closePath();
-}
-function strokePath (pts, noclose) {
-  path(pts, noclose);
-  ctx.stroke();
 }
 
 function polarPhysics (obj) {
@@ -352,6 +364,7 @@ function update () {
     player ++;
     score = 0;
     scoreForLife = 0;
+    asteroids = [];
   }
 
   // inc lifecycle
@@ -379,6 +392,7 @@ function update () {
     else {
       // Player lost. game over
       playingSince = -5000;
+      randomAsteroids();
     }
   }
 
@@ -451,13 +465,13 @@ function update () {
 
     // ai logic (determine the 3 inputs)
 
-    AIshoot = Math.random() < 0.005*dt;
-    if (Math.random() < 0.01*dt)
+    AIshoot = playingSince > 4000 && Math.random() < 0.005*dt;
+    if (playingSince > 2000 && Math.random() < 0.01*dt)
       AIrotate = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? -1 : 1;
 
     AIboost = 0;
 
-    if (!AIa) {
+    if (!AIa && playingSince > 3000) {
       AIa = 1;
       AIboost = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? -1 : 1;
     }
@@ -489,7 +503,7 @@ function update () {
   // after physics logic
   particles.forEach(applyLife);
   loopOutOfBox(spaceship);
-  asteroids.forEach(destroyOutOfBox);
+  asteroids.forEach(playingSince > 0 ? destroyOutOfBox : loopOutOfBox);
   //aliens.forEach(loopOutOfBox);
   bullets.forEach(applyLife);
   bullets.forEach(loopOutOfBox);
@@ -544,51 +558,58 @@ function drawSpaceship (o) {
     ctx.lineWidth = 2;
     var delta = (t-dying)/200;
 
-    strokePath([
+    path([
       [-6, -6 - 0.5*delta],
       [3, -3 - 0.9*delta]
     ]);
+    ctx.stroke();
 
     if (delta < 8) {
-      strokePath([
+      path([
         [3 + 0.4*delta, -3 - 0.8*delta],
         [12 + 0.4*delta, 0 - 0.5*delta]
       ]);
+      ctx.stroke();
     }
 
-    strokePath([
+    path([
       [12, 0+0.4*delta],
       [3, 3+delta]
     ]);
+    ctx.stroke();
 
     if (delta < 9) {
-      strokePath([
+      path([
         [1, 5 + delta],
         [-6, 6 + delta]
       ]);
+      ctx.stroke();
     }
 
     if (delta < 7) {
-      strokePath([
+      path([
         [-6 - delta, -6],
         [-6 - delta, 6]
       ]);
+      ctx.stroke();
     }
   }
   else {
-    strokePath([
+    path([
       [-6, -6],
       [ 12, 0],
       [ -6, 6],
       [ -5, 0]
     ]);
+    ctx.stroke();
   }
 }
 
 function drawAsteroid (o) {
   ctx.strokeStyle = "#fff";
   ctx.globalAlpha = 0.2;
-  strokePath(o[4]);
+  path(o[4]);
+  ctx.stroke();
 }
 
 function drawBullet () {
@@ -632,11 +653,12 @@ function drawInc (o) {
   ctx.lineTo(x, 0);
   ctx.stroke();
   var r = 6;
-  strokePath([
+  path([
     [ mx - r, r ],
     [ mx, 0],
     [ mx - r, -r ]
   ], 1);
+  ctx.stroke();
   restore();
 
   save();
@@ -667,117 +689,297 @@ function drawUI () {
   ctx.fillText((player*25)+" ¢", 10, 20);
 }
 
-// only support digits
-function font (txt, s) {
-  var x = 4 * s;
-  var y = 5 * s;
-  ctx.translate(-s*11*txt.length/2, 0);
+var FONT0 = [ // 0
+  [0, 0],
+  [2, 0],
+  [2, 2],
+  [0, 2],
+  [0, 0]
+];
+var FONT = [
+  FONT0,
+  [ // 1
+    [1, 0],
+    [1, 2]
+  ],
+  [ // 2
+    [0, 0],
+    [2, 0],
+    [2, 1],
+    [0, 1],
+    [0, 2],
+    [2, 2]
+  ],
+  [ // 3
+    [0, 0],
+    [2, 0],
+    [2, 2],
+    [0, 2],
+    ,
+    [0, 1],
+    [2, 1]
+  ],
+  [ // 4
+    [0, 0],
+    [0, 1],
+    [2, 1],
+    ,
+    [2, 0],
+    [2, 2]
+  ],
+  [ // 5
+    [2, 0],
+    [0, 0],
+    [0, 1],
+    [2, 1],
+    [2, 2],
+    [0, 2]
+  ],
+  [ // 6
+    [0, 0],
+    [0, 2],
+    [2, 2],
+    [2, 1],
+    [0, 1]
+  ],
+  [ // 7
+    [0, 0],
+    [2, 0],
+    [2, 2]
+  ],
+  [ // 8
+    [0, 0],
+    [2, 0],
+    [2, 2],
+    [0, 2],
+    [0, 0],
+    ,
+    [0, 1],
+    [2, 1]
+  ],
+  [ // 9
+    [2, 2],
+    [2, 0],
+    [0, 0],
+    [0, 1],
+    [2, 1]
+  ]
+];
+[
+  [// A
+    [0,2],
+    [0,2/3],
+    [1,0],
+    [2,2/3],
+    [2,2],
+    ,
+    [0,4/3],
+    [2,4/3]
+  ],
+  [ // B
+    [0, 1],
+    [0, 0],
+    [4/3,0],
+    [2,1/3],
+    [2,2/3],
+    [4/3,1],
+    [0,1],
+    [0,2],
+    [4/3,2],
+    [2,5/3],
+    [2,4/3],
+    [4/3,1]
+  ],
+  [// C
+    [2,0],
+    [0,0],
+    [0,2],
+    [2,2]
+  ],
+  ,// D
+  [// E
+    [2,0],
+    [0,0],
+    [0,2],
+    [2,2],
+    ,
+    [0,1],
+    [1.5,1]
+  ],
+  ,// F
+  [// G
+    [2,2/3],
+    [2,0],
+    [0,0],
+    [0,2],
+    [2,2],
+    [2,4/3],
+    [1,4/3]
+  ],
+  ,// H
+  [// I
+    [0,0],
+    [2,0],
+    ,
+    [1,0],
+    [1,2],
+    ,
+    [0,2],
+    [2,2]
+  ],
+  ,// J
+  ,// K
+  [// L
+    [0,0],
+    [0,2],
+    [2,2]
+  ],
+  [// M
+    [0,2],
+    [0,0],
+    [1,2/3],
+    [2,0],
+    [2,2]
+  ],
+  [// N
+    [0,2],
+    [0,0],
+    [2,2],
+    [2,0]
+  ],
+  FONT0,// O
+  [// P
+    [0,2],
+    [0,0],
+    [2,0],
+    [2,1],
+    [0,1]
+  ],
+  ,// Q
+  [// R
+    [0,2],
+    [0,0],
+    [2,0],
+    [2,1],
+    [0,1],
+    [2,2]
+  ],
+  ,// S
+  ,// T
+  ,// U
+  [// V
+    [0,0],
+    [1,2],
+    [2,0]
+  ],
+  [// W
+    [0,0],
+    [0,2],
+    [1,4/3],
+    [2,2],
+    [2,0]
+  ],
+  ,// X
+  [// Y
+    [0,0],
+    [1,2/3],
+    [2,0],
+    ,
+    [1,2/3],
+    [1,2]
+  ],
+  ,// Z
+].forEach(function (c, i) {
+  FONT[String.fromCharCode(65+i)] = c;
+});
+
+// oO ASTEROIDS font with fontSize and align (-1:right, 0:center, 1:left)
+// will side effect some ctx.translate() (that you could benefit to make text follow)
+function font (txt, fontSize, align) {
+  var l = fontSize*11*txt.length;
+  ctx.translate(align ? (align>0 ? 0 : -l) : -l/2, 0);
   for (var i=0; i<txt.length; i++) {
-    strokePath([
-      [ // 0
-        [0, 0],
-        [2*x, 0],
-        [2*x, 2*y],
-        [0, 2*y],
-        [0, 0]
-      ],
-      [ // 1
-        [x, 0],
-        [x, 2*y]
-      ],
-      [ // 2
-        [0, 0],
-        [2*x, 0],
-        [2*x, y],
-        [0, y],
-        [0, 2*y],
-        [2*x, 2*y]
-      ],
-      [ // 3
-        [0, 0],
-        [2*x, 0],
-        [2*x, 2*y],
-        [0, 2*y],
-        ,
-        [0, y],
-        [2*x, y]
-      ],
-      [ // 4
-        [0, 0],
-        [0, y],
-        [2*x, y],
-        ,
-        [2*x, 0],
-        [2*x, 2*y]
-      ],
-      [ // 5
-        [2*x, 0],
-        [0, 0],
-        [0, y],
-        [2*x, y],
-        [2*x, 2*y],
-        [0, 2*y]
-      ],
-      [ // 6
-        [0, 0],
-        [0, 2*y],
-        [2*x, 2*y],
-        [2*x, y],
-        [0, y]
-      ],
-      [ // 7
-        [0, 0],
-        [2*x, 0],
-        [2*x, 2*y]
-      ],
-      [ // 8
-        [0, 0],
-        [2*x, 0],
-        [2*x, 2*y],
-        [0, 2*y],
-        [0, 0],
-        ,
-        [0, y],
-        [2*x, y]
-      ],
-      [ // 9
-        [2*x, 2*y],
-        [2*x, 0],
-        [0, 0],
-        [0, y],
-        [2*x, y]
-      ]
-    ][txt[i]], 1);
-    ctx.translate(s*11, 0);
+    path(FONT[txt[i]] && FONT[txt[i]].map(function (o) {
+      return o && [4*fontSize*o[0], 5*fontSize*o[1]];
+    }), 1);
+    ctx.stroke();
+    ctx.translate(fontSize*11, 0);
   }
 }
 
 function drawGameUI () {
+  var x, y;
   save();
   ctx.fillStyle = ctx.strokeStyle = "#fff";
   ctx.globalAlpha = 0.3;
 
-  save();
-  ctx.translate(W/2, 30);
-  font(""+best, 1);
-  restore();
-
-  save();
-  ctx.translate(60, 10);
-  font(""+score, 1.5);
-  restore();
-
-  for (var i=1; i<lifes; i++) {
+  if (playingSince < 0) {
     save();
-    ctx.translate(80 - i * 10, 40);
-    ctx.rotate(-Math.PI/2);
-    strokePath([
-      [-4, -4],
-      [ 10, 0],
-      [ -4, 4],
-      [ -3, 0]
-    ]);
+    ctx.translate(W/2, 30);
+    font("00", 1);
     restore();
+    save();
+    ctx.translate(30, 30);
+    font("00", 2, 1);
+    restore();
+    save();
+    ctx.translate(W-30, 30);
+    font("00", 2, -1);
+    restore();
+
+    save();
+    ctx.translate(W/2 - 160, 0.7*H);
+    path([
+      [0,2],
+      [0,18]
+    ]);
+    ctx.stroke();
+    ctx.translate(40,0);
+    font("COIN", 2, 1);
+    ctx.translate(40,0);
+    path([
+      [0,2],
+      [0,18]
+    ]);
+    ctx.stroke();
+    ctx.translate(40,0);
+    font("PLAY", 2, 1);
+    restore();
+
+    save();
+    ctx.lineWidth = 2;
+    ctx.translate(W/2, 200);
+    font("GAME OVER", 2);
+    restore();
+    save();
+    ctx.translate(W/2, H-30);
+    font("2015 GREWEB INC", 1);
+    restore();
+  }
+  else {
+    save();
+    ctx.translate(W/2, 30);
+    font(""+best, 1);
+    restore();
+
+    save();
+    ctx.translate(60, 10);
+    font(""+score, 1.5);
+    restore();
+
+    for (var i=1; i<lifes; i++) {
+      save();
+      ctx.translate(80 - i * 10, 40);
+      ctx.rotate(-Math.PI/2);
+      path([
+        [-4, -4],
+        [ 10, 0],
+        [ -4, 4],
+        [ -3, 0]
+      ]);
+      ctx.stroke();
+      restore();
+    }
   }
   restore();
 }
@@ -806,15 +1008,14 @@ function renderCollection (coll, draw) {
   }
 }
 
-var lastT;
+var _lastT;
 function render (_t) {
-  t = _t;
   raf(render);
-  if (!lastT) {
-    lastT = t;
-  }
-  dt = t-lastT;
-  lastT = t;
+  if (!_lastT) _lastT = _t;
+  dt = Math.min(100, _t-_lastT);
+  _lastT = _t;
+
+  t += dt; // accumulate the game time (that is not the same as _t)
 
   update();
 
