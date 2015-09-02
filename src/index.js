@@ -1,4 +1,6 @@
 /* TODO list
+- BUG: fix the velocity (to cartesian)
+
 - ai
   - make a very good AI
   - tweak this AI to make variant of difficulty (based on player number)
@@ -625,10 +627,10 @@ function drawAsteroid (o) {
 }
 
 function drawBullet () {
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = 1 - Math.random()*Math.random();
   ctx.fillStyle = "#00f";
   ctx.beginPath();
-  ctx.arc(0, 0, 3, 0, 2*Math.PI);
+  ctx.arc(0, 0, 1.5+2.5*Math.random(), 0, 2*Math.PI);
   ctx.fill();
 }
 
@@ -714,7 +716,7 @@ function drawGlitch () {
   save();
   ctx.fillStyle =
   ctx.strokeStyle = "#f00";
-  ctx.globalAlpha = 0.05;
+  ctx.globalAlpha = 0.03;
   ctx.translate(W/2, H/2);
   ctx.beginPath();
   ctx.arc(0, 0, 4, 0, 2*Math.PI);
@@ -746,7 +748,7 @@ function drawInc (o) {
   var rot = incRotation(o);
 
   ctx.fillStyle =
-  ctx.strokeStyle = "#9af";
+  ctx.strokeStyle = "#469";
   var pts = o[5];
 
   save();
@@ -797,7 +799,7 @@ function drawInc (o) {
 }
 
 function drawUI () {
-  ctx.fillStyle = "#9af";
+  ctx.fillStyle = "#adf";
   ctx.font = "normal 32px sans-serif";
   ctx.fillText((player*25)+" ¢", GAME_MARGIN, 40);
 }
@@ -1169,13 +1171,13 @@ function render (_t) {
   blur1dShader.bind();
   blur1dShader.uniforms.t = fbo1.color[0].bind(0);
   blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 1.8, -4 ];
+  blur1dShader.uniforms.dir = [ 2, -4 ];
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   fbo1.bind();
   blur1dShader.bind();
   blur1dShader.uniforms.t = fbo2.color[0].bind(0);
   blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 2.2, -4 ];
+  blur1dShader.uniforms.dir = [ 2, -5 ];
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glareFbo.bind();
   blur1dShader.bind();
@@ -1189,25 +1191,25 @@ function render (_t) {
   blur1dShader.bind();
   blur1dShader.uniforms.t = laserFbo.color[0].bind(0);
   blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 1, 0.2 ];
+  blur1dShader.uniforms.dir = [ 1, 1 ];
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   fbo2.bind();
   blur1dShader.bind();
   blur1dShader.uniforms.t = fbo1.color[0].bind(0);
   blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ -0.2, 1 ];
+  blur1dShader.uniforms.dir = [ -1, 1 ];
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   fbo1.bind();
   blur1dShader.bind();
   blur1dShader.uniforms.t = fbo2.color[0].bind(0);
   blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 1, 0 ];
+  blur1dShader.uniforms.dir = [ 1.5, 0 ];
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   fbo2.bind();
   blur1dShader.bind();
   blur1dShader.uniforms.t = fbo1.color[0].bind(0);
   blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 0, 1 ];
+  blur1dShader.uniforms.dir = [ 0, 1.5 ];
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   fbo1.bind();
