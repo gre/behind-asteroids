@@ -798,8 +798,8 @@ function drawInc (o) {
 
 function drawUI () {
   ctx.fillStyle = "#9af";
-  ctx.font = "normal 16px sans-serif";
-  ctx.fillText((player*25)+" ¢", 10, 20);
+  ctx.font = "normal 32px sans-serif";
+  ctx.fillText((player*25)+" ¢", GAME_MARGIN, 40);
 }
 
 var FONT0 = [ // 0
