@@ -1,6 +1,9 @@
 {
   "globals": {
-    "c": 1
+    "c": 1,
+    "d": 1,
+    "u": 1,
+    "g": 1
   },
   "rules": {
     "no-sparse-arrays": 0,

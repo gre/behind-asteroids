@@ -1,7 +1,4 @@
 /* TODO list
-- gfx
-  - retina (maybe all except the game. then ensure the game fbo is using mag/minFilter)
-  - try to recreate the "shaking effect" based on screen position.
 - ai
   - make a very good AI
   - tweak this AI to make variant of difficulty (based on player number)
@@ -14,24 +11,24 @@
 - game features (if time)
 */
 
-
-var FW = 800;
-var FH = 680;
-c.width = FW;
-c.height = FH;
-c.style.width = FW+"px";
-c.style.height = FH+"px";
-
-var SEED = Math.random();
-
 // Constants
 var gl = c.getContext("webgl"),
+  FW = 800,
+  FH = 680,
+  SEED = Math.random(),
   raf = requestAnimationFrame,
   GAME_MARGIN = 120,
   GAME_INC_PADDING = 80,
-  W = c.width - 2 * GAME_MARGIN,
-  H = c.height - 2 * GAME_MARGIN,
+  W = FW - 2 * GAME_MARGIN,
+  H = FH - 2 * GAME_MARGIN,
   borderLength = 2*(W+H+2*GAME_INC_PADDING);
+
+d.style.width = FW+"px";
+
+c.width = W;
+c.height = H;
+c.style.top = GAME_MARGIN + "px";
+c.style.left = GAME_MARGIN + "px";
 
 // Temporary external libs
 var createFBO = require("gl-fbo");
@@ -39,17 +36,13 @@ var createTexture = require("gl-texture2d");
 var createShader = require("gl-shader");
 var glslify = require("glslify");
 
-var gameCanvas = document.createElement("canvas");
-gameCanvas.width = W;
-gameCanvas.height = H;
-var gameCtx = gameCanvas.getContext("2d");
+g.width = W;
+g.height = H;
+var gameCtx = g.getContext("2d");
 
-var uiCanvas = document.createElement("canvas");
-uiCanvas.width = c.width;
-uiCanvas.height = c.height;
-var uiCtx = uiCanvas.getContext("2d");
-
-document.body.appendChild(gameCanvas);
+u.width = FW;
+u.height = FH;
+var uiCtx = u.getContext("2d");
 
 var ctx;
 
@@ -67,13 +60,6 @@ gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
   1.0,  1.0
 ]), gl.STATIC_DRAW);
 
-var mainShader = createShader(gl, glslify(__dirname+"/main.vert"), glslify(__dirname+"/main.frag"));
-mainShader.bind();
-
-mainShader.attributes.p.pointer();
-mainShader.uniforms.dim = [ W, H ];
-mainShader.uniforms.game_margin = GAME_MARGIN;
-
 var blur1dShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/blur1d.frag"));
 blur1dShader.bind();
 
@@ -84,7 +70,7 @@ copyShader.bind();
 
 copyShader.attributes.p.pointer();
 
-var laserShader = createShader(gl, glslify(__dirname+"/laser.vert"), glslify(__dirname+"/laser.frag"));
+var laserShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/laser.frag"));
 laserShader.bind();
 
 laserShader.attributes.p.pointer();
@@ -109,7 +95,6 @@ gameShader.bind();
 
 gameShader.attributes.p.pointer();
 
-var gameFbo = createFBO(gl, [W, H]);
 var persistenceFbo = createFBO(gl, [W, H]);
 var playerFbo = createFBO(gl, [W, H]);
 var glareFbo = createFBO(gl, [W, H]);
@@ -118,11 +103,8 @@ var laserFbo = createFBO(gl, [W, H]);
 var fbo1 = createFBO(gl, [W, H]);
 var fbo2 = createFBO(gl, [W, H]);
 
-var textureGame = createTexture(gl, gameCanvas);
-var textureUI = createTexture(gl, uiCanvas);
+var textureGame = createTexture(gl, g);
 
-textureUI.minFilter =
-textureUI.magFilter =
 textureGame.minFilter =
 textureGame.magFilter = gl.LINEAR;
 
@@ -1084,7 +1066,7 @@ function render (_t) {
   save();
 
   save();
-  ctx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
+  ctx.clearRect(0, 0, FW, FH);
 
   drawUI();
 
@@ -1109,7 +1091,7 @@ function render (_t) {
 
   save();
   ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
+  ctx.fillRect(0, 0, W, H);
   restore();
 
   renderCollection(asteroids, drawAsteroid);
@@ -1132,8 +1114,7 @@ function render (_t) {
 
   // WEBGL after effects
 
-  textureGame.setPixels(gameCanvas);
-  textureUI.setPixels(uiCanvas);
+  textureGame.setPixels(g);
 
   laserFbo.bind();
   laserShader.bind();
@@ -1145,7 +1126,7 @@ function render (_t) {
   playerShader.bind();
   playerShader.uniforms.pt = playingSince / 1000;
   playerShader.uniforms.pl = player;
-  playerShader.uniforms.seed = SEED;
+  playerShader.uniforms.S = SEED;
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   fbo1.bind();
@@ -1232,37 +1213,21 @@ function render (_t) {
   fbo1.bind();
   persistenceShader.bind();
   persistenceShader.uniforms.t = fbo2.color[0].bind(0);
-  persistenceShader.uniforms.back = persistenceFbo.color[0].bind(1);
+  persistenceShader.uniforms.r = persistenceFbo.color[0].bind(1);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   persistenceFbo.bind();
   copyShader.bind();
   copyShader.uniforms.t = fbo1.color[0].bind(0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  gameFbo.bind();
-  gameShader.bind();
-  gameShader.uniforms.game = laserFbo.color[0].bind(0);
-  gameShader.uniforms.back = persistenceFbo.color[0].bind(1);
-  gameShader.uniforms.blur = fbo2.color[0].bind(2);
-  gameShader.uniforms.glare = glareFbo.color[0].bind(3);
-
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-/*
-  persistenceFbo.bind();
-  copyShader.bind();
-  copyShader.uniforms.t = gameFbo.color[0].bind(0);
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-  */
-
-  mainShader.bind();
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.viewport(0, 0, c.width, c.height);
-  mainShader.uniforms.game = gameFbo.color[0].bind(0);
-  //mainShader.uniforms.game = textureGame.bind(0);
-  mainShader.uniforms.ui = textureUI.bind(1);
-  mainShader.uniforms.player = playerFbo.color[0].bind(2);
-
+  gl.viewport(0, 0, W, H);
+  gameShader.bind();
+  gameShader.uniforms.g = laserFbo.color[0].bind(0);
+  gameShader.uniforms.r = persistenceFbo.color[0].bind(1);
+  gameShader.uniforms.b = fbo2.color[0].bind(2);
+  gameShader.uniforms.l = glareFbo.color[0].bind(3);
+  gameShader.uniforms.e = playerFbo.color[0].bind(4);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 

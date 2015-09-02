@@ -3,16 +3,25 @@
   <meta charset="utf-8">
   <style>
   body {
-    background: black;
+    background: #000;
   }
-  #c {
+  #d {
     margin: 0 auto;
-    display: block;
+    position: relative;
+  }
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
   }
   </style>
 </head>
 <body>
-  <canvas id="c"></canvas>
+  <div id="d">
+    <canvas id="c"></canvas>
+    <canvas id="u"></canvas>
+    <canvas id="g" hidden></canvas>
+  </div>
   <script type="text/javascript" src="http://localhost:35729/livereload.js?snipver=1"></script>
   <script src="bundle.js"></script>
 </body>

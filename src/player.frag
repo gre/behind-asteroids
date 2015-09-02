@@ -4,7 +4,7 @@ varying vec2 uv;
 
 uniform float pt; // playing since time
 uniform float pl; // player number
-uniform float seed;
+uniform float S; // Seed
 
 float disc (vec2 c, vec2 r) {
   return step(length((uv - c) / r), 1.0);
@@ -15,10 +15,7 @@ float squircle (vec2 c, vec2 r, float p) {
 }
 
 vec3 env () {
-  return 0.1 * vec3(
-    1.0-distance(uv, vec2(1.0)),
-    1.0-distance(uv, vec2(0.3, 1.0)),
-    1.0-distance(uv, vec2(1.0, 1.0))) +
+  return 0.1 +
   0.3 * vec3(1.0, 0.9, 0.7) * smoothstep(0.4, 0.1, distance(uv, vec2(0.2, 1.2))) +
   0.4 * vec3(0.8, 0.6, 1.0) * smoothstep(0.5, 0.2, distance(uv, vec2(1.3, 0.7)));
 }
@@ -27,15 +24,15 @@ vec4 player (float p, float dx) {
   vec4 c = vec4(0.0);
 
   // variable params
-  vec4 skin = 0.2 + 0.4 * pow(cos(4.*p+seed), 2.0) * vec4(1.0, 0.7, 0.3, 1.0);
+  vec4 skin = 0.2 + 0.4 * pow(cos(4.*p+S), 2.0) * vec4(1.0, 0.7, 0.3, 1.0);
   vec4 hair = vec4(0.5, 0.3, 0.3, 1.0);
   vec4 sweater = vec4(
-    0.3 * (1.0 + cos(3.*p + 6.*seed)),
-    0.2 * (1.0 + cos(7.*p + 7.*seed)),
-    0.1+0.2 * (1.0 + sin(7.*p + 8.*seed)),
+    0.3 * (1.0 + cos(3.*p + 6.*S)),
+    0.2 * (1.0 + cos(7.*p + 7.*S)),
+    0.1+0.2 * (1.0 + sin(7.*p + 8.*S)),
     1.0);
-  float feminity = step(sin(9.0*p+seed), 0.0);
-  float hairSize = 0.02 + 0.02 * feminity * cos(p+seed);
+  float feminity = step(sin(9.0*p+S), 0.0);
+  float hairSize = 0.02 + 0.02 * feminity * cos(p+S);
   float walk = step(dx, -0.01) + step(0.01, dx);
   float play = (1.0 - walk) * step(0.0, pt);
   vec2 pos = vec2(0.5) +
@@ -88,7 +85,7 @@ vec4 player (float p, float dx) {
 }
 
 void main() {
-  float light = 0.5 + 0.5 * smoothstep(2.0, 0.0, distance(pt, -2.0));
+  float light = 0.6 + 0.4 * smoothstep(2.0, 0.0, distance(pt, -2.0));
   vec4 c = vec4(0.0);
   // main player
   c += (1.0 - smoothstep(-0.0, -5.0, pt)) *
@@ -96,6 +93,6 @@ void main() {
   // prev player
   c += step (1.0, pl) *
     player(pl+step(pt, 0.0)-1.0, 2.0 *smoothstep(-4., -1., pt));
-  c *= 1.0 - 1.4 * distance(uv, vec2(0.5));
+  c *= 1.0 - 1.3 * distance(uv, vec2(0.5));
   gl_FragColor = vec4(light * mix(env(), c.rgb, clamp(c.a, 0.0, 1.0)), 1.0);
 }
