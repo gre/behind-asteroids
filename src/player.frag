@@ -16,9 +16,9 @@ float squircle (vec2 c, vec2 r, float p) {
 
 vec3 env () {
   return 0.1 * vec3(
-    distance(uv, vec2(1.0)),
-    distance(uv, vec2(0.3, 1.0)),
-    distance(uv, vec2(1.0, 0.3))) +
+    1.0-distance(uv, vec2(1.0)),
+    1.0-distance(uv, vec2(0.3, 1.0)),
+    1.0-distance(uv, vec2(1.0, 1.0))) +
   0.3 * vec3(1.0, 0.9, 0.7) * smoothstep(0.4, 0.1, distance(uv, vec2(0.2, 1.2))) +
   0.4 * vec3(0.8, 0.6, 1.0) * smoothstep(0.5, 0.2, distance(uv, vec2(1.3, 0.7)));
 }

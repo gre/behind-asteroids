@@ -1,3 +1,20 @@
+/* TODO list
+- gfx
+  - retina (maybe all except the game. then ensure the game fbo is using mag/minFilter)
+  - try to recreate the "shaking effect" based on screen position.
+- ai
+  - make a very good AI
+  - tweak this AI to make variant of difficulty (based on player number)
+- audio
+- js13k
+  - rename the glsl uniforms to 1-3 chars
+  - convert WebGL the code into standalone
+  - connect the build tools
+  - optim the code
+- game features (if time)
+*/
+
+
 var FW = 800;
 var FH = 680;
 c.width = FW;
@@ -32,6 +49,8 @@ uiCanvas.width = c.width;
 uiCanvas.height = c.height;
 var uiCtx = uiCanvas.getContext("2d");
 
+document.body.appendChild(gameCanvas);
+
 var ctx;
 
 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -65,6 +84,16 @@ copyShader.bind();
 
 copyShader.attributes.p.pointer();
 
+var laserShader = createShader(gl, glslify(__dirname+"/laser.vert"), glslify(__dirname+"/laser.frag"));
+laserShader.bind();
+
+laserShader.attributes.p.pointer();
+
+var persistenceShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/persistence.frag"));
+persistenceShader.bind();
+
+persistenceShader.attributes.p.pointer();
+
 var glareShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/glare.frag"));
 glareShader.bind();
 
@@ -84,6 +113,7 @@ var gameFbo = createFBO(gl, [W, H]);
 var persistenceFbo = createFBO(gl, [W, H]);
 var playerFbo = createFBO(gl, [W, H]);
 var glareFbo = createFBO(gl, [W, H]);
+var laserFbo = createFBO(gl, [W, H]);
 
 var fbo1 = createFBO(gl, [W, H]);
 var fbo2 = createFBO(gl, [W, H]);
@@ -139,7 +169,7 @@ function maybeCreateInc () {
     return o[6];
   }, 0);
   var probabilityCreateInc = dt * 0.02 *
-    Math.exp(-sum) *
+    Math.exp(-sum*1.2) *
     (1.0 - Math.exp(-playingSince / 90000));
   if (Math.random() > probabilityCreateInc) return;
   return createInc();
@@ -190,7 +220,7 @@ function createInc () {
   }
   var availableKeys = [];
   for (i = 65; i<91; i++) {
-    if (takenKeys.indexOf(i) === -1)
+    if (takenKeys.indexOf(i) == -1)
       availableKeys.push(i);
   }
   if (!availableKeys.length) return 0;
@@ -232,7 +262,7 @@ function explose (o) {
       o[1] + l * Math.sin(a),
       a,
       0.06,
-      30 + 10 * Math.random()
+      Math.random()<0.3 ? 0 : 1000
     ]);
   }
 }
@@ -301,7 +331,7 @@ function destroyOutOfBox (obj, i, arr) {
 }
 
 function applyLife (obj, i, arr) {
-  if ((obj[4] -= obj[3] * dt) < 0) {
+  if ((obj[4] -= dt) < 0) {
     arr.splice(i, 1);
   }
 }
@@ -357,7 +387,7 @@ function update () {
 
   playingSince += dt;
 
-  if (lifes === 0 && playingSince > 0) {
+  if (lifes == 0 && playingSince > 0) {
     // player enter
     resurrectionTime = t;
     lifes = 4;
@@ -383,7 +413,7 @@ function update () {
 
   // spaceship lifecycle
 
-  if (dying && t-dying > 2000) {
+  if (dying && t-dying > 2000 + (lifes>1 ? 0 : 2000)) {
     dying = 0;
     spaceship = [ W/2, H/2, 0, 0 ];
     if (--lifes) {
@@ -465,7 +495,7 @@ function update () {
 
     // ai logic (determine the 3 inputs)
 
-    AIshoot = playingSince > 4000 && Math.random() < 0.005*dt;
+    AIshoot = playingSince > 4000 && Math.random() < 0.003*dt;
     if (playingSince > 2000 && Math.random() < 0.01*dt)
       AIrotate = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? -1 : 1;
 
@@ -485,7 +515,7 @@ function update () {
       if (AIshoot) {
         var x = spaceship[0] + 14 * Math.cos(spaceship[2]);
         var y = spaceship[1] + 14 * Math.sin(spaceship[2]);
-        bullets.push([ x, y, spaceship[2], spaceship[3] + 0.3, 300, 0 ]);
+        bullets.push([ x, y, spaceship[2], spaceship[3] + 0.3, 1000, 0 ]);
       }
     }
   }
@@ -509,10 +539,8 @@ function update () {
   bullets.forEach(loopOutOfBox);
 }
 
-// Game DRAWING
 
 function incPosition (o) {
-  ctx.fillStyle = "#fff";
   var p = o[0];
   var x, y;
   var w = W + GAME_INC_PADDING;
@@ -550,8 +578,10 @@ function incRotation (o) {
   //return o[2];
 }
 
+// Game DRAWING
+
 function drawSpaceship (o) {
-  ctx.strokeStyle = "#fff";
+  ctx.strokeStyle = "#f00";
   ctx.globalAlpha = 0.4;
   ctx.rotate(o[2]);
   if (dying) {
@@ -606,28 +636,129 @@ function drawSpaceship (o) {
 }
 
 function drawAsteroid (o) {
-  ctx.strokeStyle = "#fff";
   ctx.globalAlpha = 0.2;
+  ctx.strokeStyle = "#f00";
   path(o[4]);
   ctx.stroke();
 }
 
 function drawBullet () {
-  ctx.fillStyle = "#fff";
-  ctx.beginPath();
   ctx.globalAlpha = 1;
+  ctx.fillStyle = "#00f";
+  ctx.beginPath();
   ctx.arc(0, 0, 3, 0, 2*Math.PI);
   ctx.fill();
 }
 
 function drawParticle (o) {
-  ctx.strokeStyle = "#fff";
-  ctx.rotate(o[2]);
   ctx.globalAlpha = 0.8;
+  ctx.strokeStyle = "#f00";
+  ctx.rotate(o[2]);
   ctx.beginPath();
   ctx.arc(0, 0, 1, 0, 2*Math.PI);
   ctx.fill();
 }
+function drawGameUI () {
+  save();
+  ctx.fillStyle = ctx.strokeStyle = "#0f0";
+  ctx.globalAlpha = 0.3;
+
+
+  save();
+  ctx.translate(W/2, 20);
+  font(scoreTxt(best), .6);
+  restore();
+
+  save();
+  ctx.translate(30, 20);
+  font(scoreTxt(score), 1.5, 1);
+  restore();
+
+  if (playingSince < 0) {
+    save();
+    ctx.translate(W-30, 20);
+    font(scoreTxt(0), 1.5, -1);
+    restore();
+
+    save();
+    ctx.translate(W/2 - 160, 0.7*H);
+    path([
+      [0,2],
+      [0,18]
+    ]);
+    ctx.stroke();
+    ctx.translate(40,0);
+    font("COIN", 2, 1);
+    ctx.translate(40,0);
+    path([
+      [0,2],
+      [0,18]
+    ]);
+    ctx.stroke();
+    ctx.translate(40,0);
+    font("PLAY", 2, 1);
+    restore();
+  }
+  else {
+    for (var i=1; i<lifes; i++) {
+      save();
+      ctx.translate(40 + i * 10, 50);
+      ctx.rotate(-Math.PI/2);
+      path([
+        [-4, -4],
+        [ 10, 0],
+        [ -4, 4],
+        [ -3, 0]
+      ]);
+      ctx.stroke();
+      restore();
+    }
+  }
+  if (dying && lifes==1) {
+    save();
+    ctx.lineWidth = 2;
+    ctx.translate(W/2, 140);
+    font("GAME OVER", 2);
+    restore();
+  }
+  save();
+  ctx.translate(W/2, H-14);
+  font("2015 GREWEB INC", .6);
+  restore();
+  restore();
+}
+
+function drawGlitch () {
+  save();
+  ctx.fillStyle =
+  ctx.strokeStyle = "#f00";
+  ctx.globalAlpha = 0.05;
+  ctx.translate(W/2, H/2);
+  ctx.beginPath();
+  ctx.arc(0, 0, 4, 0, 2*Math.PI);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, 12, 0, 2*Math.PI);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, 12, 4, 6);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, 12, 1, 2);
+  ctx.stroke();
+  restore();
+  /*
+  float destroyed () {
+    vec2 ratio = vec2(1.0, dim.x / dim.y);
+    float d = distance(uv/ratio, vec2(0.5)/ratio);
+    return step(d, 0.008) +
+    step(0.023, d) * step(d, 0.026);
+  }
+  */
+}
+
+//// UI
 
 function drawInc (o) {
   var rot = incRotation(o);
@@ -907,81 +1038,8 @@ function font (txt, fontSize, align) {
   }
 }
 
-function drawGameUI () {
-  var x, y;
-  save();
-  ctx.fillStyle = ctx.strokeStyle = "#fff";
-  ctx.globalAlpha = 0.3;
-
-  if (playingSince < 0) {
-    save();
-    ctx.translate(W/2, 30);
-    font("00", 1);
-    restore();
-    save();
-    ctx.translate(30, 30);
-    font("00", 2, 1);
-    restore();
-    save();
-    ctx.translate(W-30, 30);
-    font("00", 2, -1);
-    restore();
-
-    save();
-    ctx.translate(W/2 - 160, 0.7*H);
-    path([
-      [0,2],
-      [0,18]
-    ]);
-    ctx.stroke();
-    ctx.translate(40,0);
-    font("COIN", 2, 1);
-    ctx.translate(40,0);
-    path([
-      [0,2],
-      [0,18]
-    ]);
-    ctx.stroke();
-    ctx.translate(40,0);
-    font("PLAY", 2, 1);
-    restore();
-
-    save();
-    ctx.lineWidth = 2;
-    ctx.translate(W/2, 200);
-    font("GAME OVER", 2);
-    restore();
-    save();
-    ctx.translate(W/2, H-30);
-    font("2015 GREWEB INC", 1);
-    restore();
-  }
-  else {
-    save();
-    ctx.translate(W/2, 30);
-    font(""+best, 1);
-    restore();
-
-    save();
-    ctx.translate(60, 10);
-    font(""+score, 1.5);
-    restore();
-
-    for (var i=1; i<lifes; i++) {
-      save();
-      ctx.translate(80 - i * 10, 40);
-      ctx.rotate(-Math.PI/2);
-      path([
-        [-4, -4],
-        [ 10, 0],
-        [ -4, 4],
-        [ -3, 0]
-      ]);
-      ctx.stroke();
-      restore();
-    }
-  }
-  restore();
+function scoreTxt (s) {
+  return (s<=9?"0":"")+s;
 }
 
 // Game Post Effects
@@ -1068,12 +1126,20 @@ function render (_t) {
 
   drawGameUI();
 
+  drawGlitch();
+
   restore();
 
   // WEBGL after effects
 
   textureGame.setPixels(gameCanvas);
   textureUI.setPixels(uiCanvas);
+
+  laserFbo.bind();
+  laserShader.bind();
+  laserShader.uniforms.t = textureGame.bind(0);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
 
   playerFbo.bind();
   playerShader.bind();
@@ -1110,7 +1176,7 @@ function render (_t) {
   // Glare
   glareFbo.bind();
   glareShader.bind();
-  glareShader.uniforms.t = textureGame.bind(0);
+  glareShader.uniforms.t = laserFbo.color[0].bind(0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   fbo1.bind();
   blur1dShader.bind();
@@ -1140,7 +1206,19 @@ function render (_t) {
   // Blur
   fbo1.bind();
   blur1dShader.bind();
-  blur1dShader.uniforms.t = textureGame.bind(0);
+  blur1dShader.uniforms.t = laserFbo.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ 1, 0.2 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo2.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
+  blur1dShader.uniforms.dim = [ W, H ];
+  blur1dShader.uniforms.dir = [ -0.2, 1 ];
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  fbo1.bind();
+  blur1dShader.bind();
+  blur1dShader.uniforms.t = fbo2.color[0].bind(0);
   blur1dShader.uniforms.dim = [ W, H ];
   blur1dShader.uniforms.dir = [ 1, 0 ];
   gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -1150,49 +1228,37 @@ function render (_t) {
   blur1dShader.uniforms.dim = [ W, H ];
   blur1dShader.uniforms.dir = [ 0, 1 ];
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+
   fbo1.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo2.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 1, 1 ];
+  persistenceShader.bind();
+  persistenceShader.uniforms.t = fbo2.color[0].bind(0);
+  persistenceShader.uniforms.back = persistenceFbo.color[0].bind(1);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo2.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 1, -1 ];
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo1.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo2.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 0, 1 ];
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo2.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 1, 0 ];
+  persistenceFbo.bind();
+  copyShader.bind();
+  copyShader.uniforms.t = fbo1.color[0].bind(0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   gameFbo.bind();
   gameShader.bind();
-  gameShader.uniforms.game = textureGame.bind(0);
+  gameShader.uniforms.game = laserFbo.color[0].bind(0);
   gameShader.uniforms.back = persistenceFbo.color[0].bind(1);
   gameShader.uniforms.blur = fbo2.color[0].bind(2);
   gameShader.uniforms.glare = glareFbo.color[0].bind(3);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+/*
   persistenceFbo.bind();
   copyShader.bind();
   copyShader.uniforms.t = gameFbo.color[0].bind(0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+  */
 
   mainShader.bind();
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, c.width, c.height);
-  mainShader.uniforms.game = persistenceFbo.color[0].bind(0);
+  mainShader.uniforms.game = gameFbo.color[0].bind(0);
   //mainShader.uniforms.game = textureGame.bind(0);
   mainShader.uniforms.ui = textureUI.bind(1);
   mainShader.uniforms.player = playerFbo.color[0].bind(2);

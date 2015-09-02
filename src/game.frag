@@ -14,10 +14,9 @@ void main() {
 
   vec3 c =
     gla +
-    0.3 * bac +
-    blu * 3.0 * vec3(0.1, 0.3, 1.0) +
-    1.0 * gam +
-    vec3(0.03, 0.03, 0.04);
+    (bac + 2.0 * blu) * vec3(0.3, 0.5, 1.0) +
+    gam +
+    vec3(0.03, 0.04, 0.06);
 
   gl_FragColor = vec4(c, 1.0);
 }
