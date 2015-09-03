@@ -1,57 +1,75 @@
 /* TODO list
 - BUG: fix the velocity (to cartesian)
-
 - ai
   - make a very good AI
   - tweak this AI to make variant of difficulty (based on player number)
 - audio
-- js13k
-  - rename the glsl uniforms to 1-3 chars
-  - convert WebGL the code into standalone
-  - connect the build tools
-  - optim the code
+- mobile
 - game features (if time)
+  - UFO "bonus"
 */
 
-// Constants
 var gl = c.getContext("webgl"),
+  ctx,
+  gameCtx = g.getContext("2d"),
+  uiCtx = u.getContext("2d"),
   FW = 800,
   FH = 680,
-  SEED = Math.random(),
-  raf = requestAnimationFrame,
   GAME_MARGIN = 120,
   GAME_INC_PADDING = 80,
   W = FW - 2 * GAME_MARGIN,
   H = FH - 2 * GAME_MARGIN,
-  borderLength = 2*(W+H+2*GAME_INC_PADDING);
+  borderLength = 2*(W+H+2*GAME_INC_PADDING),
+  SEED = Math.random();
 
-d.style.width = FW+"px";
-
-c.width = W;
-c.height = H;
+d.style.width = FW + "px";
+g.width = c.width = W;
+g.height = c.height = H;
 c.style.top = GAME_MARGIN + "px";
 c.style.left = GAME_MARGIN + "px";
-
-// Temporary external libs
-var createFBO = require("gl-fbo");
-var createTexture = require("gl-texture2d");
-var createShader = require("gl-shader");
-var glslify = require("glslify");
-
-g.width = W;
-g.height = H;
-var gameCtx = g.getContext("2d");
-
 u.width = FW;
 u.height = FH;
-var uiCtx = u.getContext("2d");
 
-var ctx;
+// set up WebGL layer
+
+// webgl utilities **SPECIFIC** to the game
+
+function glCreateShader (vert, frag) {
+  var shader = createShader(gl, vert, frag);
+  glBindShader(shader);
+  shader.attributes.p.pointer();
+  return shader;
+}
+function glBindShader (shader) {
+  return shader.bind();
+}
+function glCreateFBO () {
+  return createFBO(gl, [W, H]);
+}
+function glCreateTexture () {
+  var t = createTexture(gl, [W, H]);
+  t.minFilter = t.magFilter = gl.LINEAR;
+  return t;
+}
+function glSetTexture (t, value) {
+  return t.setPixels(value);
+}
+function glBindFBO (fbo) {
+  return fbo.bind();
+}
+function glSetUniform (shader, u, value) {
+  return shader.uniforms[u] = value;
+}
+function glGetFBOTexture (fbo) {
+  return fbo.color[0];
+}
+function glBindTexture (t) {
+  return t.bind();
+}
 
 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
 var buffer = gl.createBuffer();
-
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
   -1.0, -1.0,
@@ -62,53 +80,22 @@ gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
   1.0,  1.0
 ]), gl.STATIC_DRAW);
 
-var blur1dShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/blur1d.frag"));
-blur1dShader.bind();
+var blur1dShader = glCreateShader(STATIC_VERT, BLUR1D_FRAG);
+var copyShader = glCreateShader(STATIC_VERT, COPY_FRAG);
+var laserShader = glCreateShader( STATIC_VERT, LASER_FRAG);
+var persistenceShader = glCreateShader(STATIC_VERT, PERSISTENCE_FRAG);
+var glareShader = glCreateShader(STATIC_VERT, GLARE_FRAG);
+var playerShader = glCreateShader(STATIC_VERT, PLAYER_FRAG);
+var gameShader = glCreateShader(STATIC_VERT, GAME_FRAG);
 
-blur1dShader.attributes.p.pointer();
+var persistenceFbo = glCreateFBO();
+var playerFbo = glCreateFBO();
+var glareFbo = glCreateFBO();
+var laserFbo = glCreateFBO();
+var fbo1 = glCreateFBO();
+var fbo2 = glCreateFBO();
 
-var copyShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/copy.frag"));
-copyShader.bind();
-
-copyShader.attributes.p.pointer();
-
-var laserShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/laser.frag"));
-laserShader.bind();
-
-laserShader.attributes.p.pointer();
-
-var persistenceShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/persistence.frag"));
-persistenceShader.bind();
-
-persistenceShader.attributes.p.pointer();
-
-var glareShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/glare.frag"));
-glareShader.bind();
-
-glareShader.attributes.p.pointer();
-
-var playerShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/player.frag"));
-playerShader.bind();
-
-playerShader.attributes.p.pointer();
-
-var gameShader = createShader(gl, glslify(__dirname+"/static.vert"), glslify(__dirname+"/game.frag"));
-gameShader.bind();
-
-gameShader.attributes.p.pointer();
-
-var persistenceFbo = createFBO(gl, [W, H]);
-var playerFbo = createFBO(gl, [W, H]);
-var glareFbo = createFBO(gl, [W, H]);
-var laserFbo = createFBO(gl, [W, H]);
-
-var fbo1 = createFBO(gl, [W, H]);
-var fbo2 = createFBO(gl, [W, H]);
-
-var textureGame = createTexture(gl, g);
-
-textureGame.minFilter =
-textureGame.magFilter = gl.LINEAR;
+var textureGame = glCreateTexture();
 
 var t = 0, dt;
 
@@ -148,16 +135,6 @@ document.addEventListener("keyup", function (e) {
 
 // game actions
 
-function maybeCreateInc () {
-  var sum = incomingObjects.reduce(function (sum, o) {
-    return o[6];
-  }, 0);
-  var probabilityCreateInc = dt * 0.02 *
-    Math.exp(-sum*1.2) *
-    (1.0 - Math.exp(-playingSince / 90000));
-  if (Math.random() > probabilityCreateInc) return;
-  return createInc();
-}
 
 function sendAsteroid (o) {
   var p = incPosition(o);
@@ -184,22 +161,24 @@ function randomAsteroids () {
   }
 }
 
-/*
-setTimeout(function () {
-  setInterval(function () {
-    createInc();
-    if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
-    incomingObjects.splice(0, 1);
-  }, 100);
-}, 5000);
-*/
+function maybeCreateInc () {
+  var sum = incomingObjects.reduce(function (sum, o) {
+    return o[6];
+  }, 0);
+  var probabilityCreateInc = dt * 0.02 *
+    Math.exp(-sum*2) *
+    (1 + player / 3 - Math.exp(-playingSince / 60000));
+  if (Math.random() > probabilityCreateInc) return;
+  return createInc();
+}
 
 function createInc () {
   var pos = Math.random() * borderLength;
   var takenKeys = [], i;
   for (i=0; i<incomingObjects.length; ++i) {
     var o = incomingObjects[i];
-    if (pos - 60 < o[0] && o[0] < pos + 60) return 0;
+    var p = o[0] % borderLength;
+    if (pos - 60 < p && p < pos + 60) return 0;
     takenKeys.push(o[7]);
   }
   var availableKeys = [];
@@ -209,11 +188,11 @@ function createInc () {
   }
   if (!availableKeys.length) return 0;
 
-  var vel = 0.1;
+  var vel = 0.1; // FIXME remove
   var ang = 2*Math.PI*Math.random();
   var force = 30*Math.random();
-  var lvl = Math.floor(2 + 2 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
-  var rotVel = 0.002 * (1 + lvl * Math.random() * Math.random());
+  var lvl = Math.floor(2 + 3 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
+  var rotVel = 0.002 * (1 - 0.5 * Math.exp((1-player)/3) + lvl * Math.random() * Math.random());
   var shape = randomAsteroidShape(lvl);
   var key = availableKeys[Math.floor(Math.random() * availableKeys.length)];
 
@@ -303,10 +282,6 @@ function polarPhysics (obj) {
   obj[1] += s * y;
 }
 
-function incomingPhysics (obj) {
-  obj[0] = (obj[0] + dt * obj[1]) % borderLength;
-}
-
 function destroyOutOfBox (obj, i, arr) {
   var B = 20;
   if (obj[0] < -B || obj[1] < -B || obj[0] > W+B || obj[1] > H+B) {
@@ -356,6 +331,7 @@ function resetSpaceship () {
 */
 
 function applyIncLogic (o) {
+  o[0] += 0.1 * dt;
   o[2] += o[4] * dt;
   o[3] = o[3] < 10 ? 60 : o[3] * (1 - 0.0008 * dt);
 }
@@ -504,17 +480,14 @@ function update () {
     }
   }
 
-  // apply physics
   polarPhysics(spaceship);
   asteroids.forEach(polarPhysics);
   //aliens.forEach(polarPhysics);
   bullets.forEach(polarPhysics);
   particles.forEach(polarPhysics);
-  incomingObjects.forEach(incomingPhysics);
 
   incomingObjects.forEach(applyIncLogic);
 
-  // after physics logic
   particles.forEach(applyLife);
   loopOutOfBox(spaceship);
   asteroids.forEach(playingSince > 0 ? destroyOutOfBox : loopOutOfBox);
@@ -525,7 +498,7 @@ function update () {
 
 
 function incPosition (o) {
-  var p = o[0];
+  var p = o[0] % borderLength;
   var x, y;
   var w = W + GAME_INC_PADDING;
   var h = H + GAME_INC_PADDING;
@@ -1052,7 +1025,7 @@ function renderCollection (coll, draw) {
 
 var _lastT;
 function render (_t) {
-  raf(render);
+  requestAnimationFrame(render);
   if (!_lastT) _lastT = _t;
   dt = Math.min(100, _t-_lastT);
   _lastT = _t;
@@ -1233,4 +1206,17 @@ function render (_t) {
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-raf(render);
+requestAnimationFrame(render);
+
+
+
+/*
+// DEBUG
+setTimeout(function () {
+  setInterval(function () {
+    createInc();
+    if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
+    incomingObjects.splice(0, 1);
+  }, 100);
+}, 5000);
+*/

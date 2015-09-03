@@ -3,7 +3,19 @@
     "c": 1,
     "d": 1,
     "u": 1,
-    "g": 1
+    "g": 1,
+    "STATIC_VERT": 1,
+    "BLUR1D_FRAG": 1,
+    "COPY_FRAG": 1,
+    "GAME_FRAG": 1,
+    "GLARE_FRAG": 1,
+    "LASER_FRAG": 1,
+    "PERSISTENCE_FRAG": 1,
+    "PLAYER_FRAG": 1,
+
+    "createFBO": 1,
+    "createTexture": 1,
+    "createShader": 1
   },
   "rules": {
     "no-sparse-arrays": 0,

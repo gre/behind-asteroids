@@ -9,6 +9,7 @@ void main() {
     cos(47.0 * uv.y),
     sin(67.0 * uv.x)
   );
-  float r = c.r + c.g + c.b + texture2D(t, uv+off).b;
-  gl_FragColor = vec4(vec3(r), 1.0);
+  gl_FragColor = vec4(
+    c.r + c.g + c.b + texture2D(t, uv+off).b
+  );
 }
