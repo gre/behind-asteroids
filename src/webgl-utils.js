@@ -1,4 +1,4 @@
-/* global gl, W, H */
+/* global gl, W, H, DEBUG */
 
 function glCreateShader (vert, frag) { // eslint-disable-line no-unused-vars
   var handle, type = gl.VERTEX_SHADER, src = vert;
@@ -7,6 +7,11 @@ function glCreateShader (vert, frag) { // eslint-disable-line no-unused-vars
   gl.compileShader(handle);
   var vertex = handle;
 
+  if (DEBUG) {
+    if (!gl.getShaderParameter(handle, gl.COMPILE_STATUS))
+      throw gl.getShaderInfoLog(handle);
+  }
+
   type = gl.FRAGMENT_SHADER;
   src = frag;
   handle = gl.createShader(type);
@@ -14,10 +19,21 @@ function glCreateShader (vert, frag) { // eslint-disable-line no-unused-vars
   gl.compileShader(handle);
   var fragment = handle;
 
+  if (DEBUG) {
+    if (!gl.getShaderParameter(handle, gl.COMPILE_STATUS))
+      throw gl.getShaderInfoLog(handle);
+  }
+
   var program = gl.createProgram();
   gl.attachShader(program, vertex);
   gl.attachShader(program, fragment);
   gl.linkProgram(program);
+
+  if (DEBUG) {
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+      throw gl.getProgramInfoLog(program);
+  }
+
   gl.useProgram(program);
   var p = gl.getAttribLocation(program, "p");
   gl.enableVertexAttribArray(p);

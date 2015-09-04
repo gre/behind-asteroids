@@ -5,6 +5,7 @@ varying vec2 uv;
 uniform float pt; // playing since time
 uniform float pl; // player number
 uniform float S; // Seed
+uniform float ex; // excitement
 
 float disc (vec2 c, vec2 r) {
   return step(length((uv - c) / r), 1.0);
@@ -22,6 +23,10 @@ vec3 env () {
 
 vec4 player (float p, float dx) {
   vec4 c = vec4(0.0);
+
+  vec2 e = vec2(
+    min(ex, 1.0),
+    mix(min(ex, 1.0), min(ex-1.0, 1.0), 0.5));
 
   // variable params
   vec4 skin = 0.2 + 0.4 * pow(cos(4.*p+S), 2.0) * vec4(1.0, 0.7, 0.3, 1.0);
@@ -41,9 +46,9 @@ vec4 player (float p, float dx) {
     0.03 * cos(4.0*pt + sin(pt)),
     0.05 * abs(sin(3.0*pt))) +
   // playing cycle
-  play * vec2(
-    0.03 * cos(pt * (1.0 + 0.1 * sin(pt))),
-    0.03 * abs(sin(pt)));
+  e * play * vec2(
+    0.05 * cos(pt * (1.0 + 0.1 * sin(pt))),
+    0.05 * abs(sin(pt)));
   vec2 pos2 = mix(pos, vec2(0.5), 0.5);
   pos.x += dx;
   pos2.x += dx;
@@ -63,12 +68,12 @@ vec4 player (float p, float dx) {
   // left hand
   c += play * (hair + skin) * disc(pos2 - vec2(
     -0.2 + 0.01 * cos(5.0*pt),
-    0.45 - 0.05 * step(0.0, pt) * pow(sin(8.0 * pt * (1.0 + 0.2 * cos(pt))), 4.0)
+    0.45 - 0.1 * e.y * step(0.0, pt) * pow(sin(8.0 * pt * (1.0 + 0.2 * cos(pt))), 4.0)
   ), vec2(0.055, 0.05));
   // right hand
   c += play * (hair + skin) * disc(pos2 - vec2(
     0.2 + 0.01 * cos(5.0*pt),
-    0.45 - 0.05 * step(2.0, pt) * pow(cos(7.0 * pt), 4.0)
+    0.45 - 0.1 * e.x * step(2.0, pt) * pow(cos(7.0 * pt), 4.0)
   ), vec2(0.055, 0.05));
   // neck
   c += step(c.a, 0.0) * (hair + skin) *

@@ -49,7 +49,8 @@ var gl = c.getContext("webgl"),
   W = FW - 2 * GAME_MARGIN,
   H = FH - 2 * GAME_MARGIN,
   borderLength = 2*(W+H+2*GAME_INC_PADDING),
-  SEED = Math.random();
+  SEED = Math.random(),
+  excitementSmoothed = 0;
 
 d.style.width = FW + "px";
 g.width = c.width = W;
@@ -120,7 +121,7 @@ var t = 0, dt,
   player = 0,
   lifes = 0,
 
-  AIshoot = 0, AIboost = 0, AIrotate = 0;
+  AIshoot = 0, AIboost = 0, AIrotate = 0, AIexcitement = 0;
 
 randomAsteroids();
 
@@ -167,7 +168,7 @@ function maybeCreateInc () {
   var sum = incomingObjects.reduce(function (sum, o) {
     return o[6];
   }, 0);
-  var probabilityCreateInc = dt * 0.02 *
+  var probabilityCreateInc = dt * 0.03 *
     Math.exp(-sum*2) *
     (1 + player / 3 - Math.exp(-playingSince / 60000));
   if (Math.random() > probabilityCreateInc) return;
@@ -344,59 +345,29 @@ function aiLogic () { // set the 3 AI inputs (rotate, shoot, boost)
   AIshoot = 0;
   AIboost = 0;
 
+  // first part is data extraction / analysis
+
   var ax = Math.cos(spaceship[4]);
   var ay = Math.sin(spaceship[4]);
   var vel = Math.sqrt(spaceship[2]*spaceship[2]+spaceship[3]*spaceship[3]);
 
   var xDistanceToEdge = Math.min(spaceship[0], W-spaceship[0]);
   var yDistanceToEdge = Math.min(spaceship[1], H-spaceship[1]);
-  var pred = 200 + 300 * Math.random();
+  var pred = 100 + 300 * Math.random();
   var predSpaceship = [
     spaceship[0] + pred * spaceship[2],
     spaceship[1] + pred * spaceship[3]
   ];
 
-  function opp (dx, dy) { // going opposite of a vector based on current head direction
-    return (ax > ay) ?
-      ((ax<0)==(dx<0) ? -1 : 1) :
-      ((ay<0)==(dy<0) ? -1 : 1);
-  }
-
-  // From the least to the most important reactions
-
-  // random behavior
-  if (playingSince > 1000) {
-    AIshoot = playingSince > 3000 && Math.random() < 0.00001*dt*(1+asteroids.length);
-    if (playingSince > 2000 && Math.random() < 0.001*dt*(1+asteroids.length))
-      AIrotate = Math.random() < 0.2 ? 0 : Math.random() < 0.5 ? -1 : 1;
-    else
-      AIrotate = Math.random() < 0.002 * dt ? 0 : prevRot;
-
-    AIboost = Math.random() < 0.6 ? 0 : Math.random() < 0.5 ? -1 : 1;
-    if (Math.exp(-vel*10)<Math.random()) {
-      AIboost = opp(spaceship[2], spaceship[3]);
-    }
-  }
-
-  // trying to avoid edges
-
-  if (xDistanceToEdge < 100 || yDistanceToEdge < 100) {
-    AIboost = (xDistanceToEdge < yDistanceToEdge) ?
-      ((spaceship[0]<W/2)==(ax<0) ? -1 : 1) :
-      ((spaceship[1]<H/2)==(ay<0) ? -1 : 1);
-  }
-
+  var danger = 0;
   var closestAsteroid, closestAsteroidPredDist;
   var smallerDangerousAsteroid, smallerDangerousAsteroidWeight;
 
   for (i = 0; i < asteroids.length; ++i) {
     var a = asteroids[i];
-    x = Math.cos(a[2]);
-    y = Math.sin(a[2]);
-    var s = pred * a[3];
     var aPred = [].concat(a);
-    aPred[0] += s * x;
-    aPred[1] += s * y;
+    aPred[0] += Math.cos(a[2]) * a[3] * pred;
+    aPred[1] += Math.sin(a[2]) * a[3] * pred;
     var curDist = dist(a, spaceship) - (10 + 10 * a[5]);
     var predDist = dist(aPred, predSpaceship) - (10 + 10 * a[5]);
     if (curDist - predDist > pred / 200 && // approaching
@@ -406,6 +377,7 @@ function aiLogic () { // set the 3 AI inputs (rotate, shoot, boost)
         closestAsteroid = a;
         smallerDangerousAsteroid = a;
         closestAsteroidPredDist = predDist;
+        danger ++;
       }
     }
 
@@ -415,6 +387,44 @@ function aiLogic () { // set the 3 AI inputs (rotate, shoot, boost)
         smallerDangerousAsteroid = aPred;
         smallerDangerousAsteroidWeight = w;
       }
+    }
+  }
+
+  // utility
+
+  function opp (dx, dy) { // going opposite of a vector based on current head direction
+    return (ax > ay) ?
+      ((ax<0)==(dx<0) ? -1 : 1) :
+      ((ay<0)==(dy<0) ? -1 : 1);
+  }
+
+  AIexcitement =
+    (1 - Math.exp(-asteroids.length/10)) + // total asteroids
+    (1 - Math.exp(-danger/3)) // danger
+  ;
+
+  // Now we implement the spaceship reaction
+  // From the least to the most important reactions
+
+  // initially trying to avoid edges
+
+  // FIXME: this algorithm is not perfectlyworking, something is wrong
+  if (Math.random()<0.005*dt)
+    AIboost = (xDistanceToEdge < yDistanceToEdge) ?
+    ((spaceship[0]<W/2)==(ax<0) ? -1 : 1) :
+    ((spaceship[1]<H/2)==(ay<0) ? -1 : 1);
+
+  // random behavior
+  if (playingSince > 1000) {
+    AIshoot = playingSince > 3000 && Math.random() < 0.0001*dt*AIexcitement;
+    if (playingSince > 2000 && Math.random() < 0.01*dt*AIexcitement)
+      AIrotate = Math.random() < 0.5 ? -1 : 1;
+    else
+      AIrotate = Math.random() < 0.002 * dt ? 0 : prevRot;
+
+    if (Math.random() < 0.6) AIboost = Math.random() < 0.5 ? -1 : 1;
+    if (Math.exp(-vel*10)< 1-AIexcitement) {
+      AIboost = opp(spaceship[2], spaceship[3]);
     }
   }
 
@@ -587,6 +597,8 @@ function update () {
   //aliens.forEach(loopOutOfBox);
   bullets.forEach(applyLife);
   bullets.forEach(loopOutOfBox);
+
+  excitementSmoothed += 0.04 * (AIexcitement - excitementSmoothed);
 }
 
 
@@ -956,6 +968,7 @@ function render (_t) {
   glBindShader(playerShader);
   gl.uniform1f(glUniformLocation(playerShader, "pt"), playingSince / 1000);
   gl.uniform1f(glUniformLocation(playerShader, "pl"), player);
+  gl.uniform1f(glUniformLocation(playerShader, "ex"), excitementSmoothed);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo1);
   glBindShader(blur1dShader);

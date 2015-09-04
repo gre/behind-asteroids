@@ -1,4 +1,5 @@
 
+cat src/env.js
 cat src/path.js
 cat src/font.js
 cat src/webgl-utils.js
