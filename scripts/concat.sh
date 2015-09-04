@@ -8,6 +8,4 @@ for glsl in *.vert *.frag; do
 done
 cd ..;
 
-browserify src/libs.js # TEMPORARY
-
 cat src/index.js

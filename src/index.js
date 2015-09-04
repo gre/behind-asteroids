@@ -35,36 +35,66 @@ u.height = FH;
 // webgl utilities **SPECIFIC** to the game
 
 function glCreateShader (vert, frag) {
-  var shader = createShader(gl, vert, frag);
-  glBindShader(shader);
-  shader.attributes.p.pointer();
-  return shader;
+  var handle, type = gl.VERTEX_SHADER, src = vert;
+  handle = gl.createShader(type);
+  gl.shaderSource(handle, src);
+  gl.compileShader(handle);
+  var vertex = handle;
+
+  type = gl.FRAGMENT_SHADER;
+  src = frag;
+  handle = gl.createShader(type);
+  gl.shaderSource(handle, src);
+  gl.compileShader(handle);
+  var fragment = handle;
+
+  var program = gl.createProgram();
+  gl.attachShader(program, vertex);
+  gl.attachShader(program, fragment);
+  gl.linkProgram(program);
+  gl.useProgram(program);
+  var p = gl.getAttribLocation(program, "p");
+  gl.enableVertexAttribArray(p);
+  gl.vertexAttribPointer(p, 2, gl.FLOAT, false, 0, 0);
+  return [program];
 }
 function glBindShader (shader) {
-  return shader.bind();
+  gl.useProgram(shader[0]);
 }
-function glCreateFBO () {
-  return createFBO(gl, [W, H]);
+function glUniformLocation(shader, name) {
+  return shader[name] || (shader[name] = gl.getUniformLocation(shader[0], name));
 }
 function glCreateTexture () {
-  var t = createTexture(gl, [W, H]);
-  t.minFilter = t.magFilter = gl.LINEAR;
-  return t;
+  var tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return tex;
 }
 function glSetTexture (t, value) {
-  return t.setPixels(value);
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, value);
+}
+function glBindTexture (t, unit) {
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  return unit;
+}
+function glCreateFBO () {
+  var handle = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, handle);
+  var color = glCreateTexture();
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, color, 0);
+  return [handle, color];
 }
 function glBindFBO (fbo) {
-  return fbo.bind();
-}
-function glSetUniform (shader, u, value) {
-  return shader.uniforms[u] = value;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[0]);
 }
 function glGetFBOTexture (fbo) {
-  return fbo.color[0];
-}
-function glBindTexture (t) {
-  return t.bind();
+  return fbo[1];
 }
 
 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -721,7 +751,7 @@ function drawInc (o) {
   var rot = incRotation(o);
 
   ctx.fillStyle =
-  ctx.strokeStyle = "#469";
+  ctx.strokeStyle = "#9cf";
   var pts = o[5];
 
   save();
@@ -1089,120 +1119,121 @@ function render (_t) {
 
   // WEBGL after effects
 
-  textureGame.setPixels(g);
+  glSetTexture(textureGame, g);
 
-  laserFbo.bind();
-  laserShader.bind();
-  laserShader.uniforms.t = textureGame.bind(0);
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  glBindFBO(laserFbo);
+  glBindShader(laserShader);
+  gl.uniform1i(glUniformLocation(laserShader, "t"), glBindTexture(textureGame, 0));
 
-
-  playerFbo.bind();
-  playerShader.bind();
-  playerShader.uniforms.pt = playingSince / 1000;
-  playerShader.uniforms.pl = player;
-  playerShader.uniforms.S = SEED;
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  fbo1.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = playerFbo.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 6, 0 ];
+
+  glBindFBO(playerFbo);
+  glBindShader(playerShader);
+  gl.uniform1f(glUniformLocation(playerShader, "pt"), playingSince / 1000);
+  gl.uniform1f(glUniformLocation(playerShader, "pl"), player);
+  gl.uniform1f(glUniformLocation(playerShader, "S"), SEED);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo2.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 0, 2 ];
+
+  glBindFBO(fbo1);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(playerFbo), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  6, 0 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo1.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo2.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 2, 1 ];
+  glBindFBO(fbo2);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  0, 2 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  playerFbo.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 2, -1 ];
+  glBindFBO(fbo1);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, 1 );
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  glBindFBO(playerFbo);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -1 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   // Glare
-  glareFbo.bind();
-  glareShader.bind();
-  glareShader.uniforms.t = laserFbo.color[0].bind(0);
+  glBindFBO(glareFbo);
+  glBindShader(glareShader);
+  gl.uniform1i(glUniformLocation(glareShader, "t"), glBindTexture(glGetFBOTexture(laserFbo), 0));
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo1.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = glareFbo.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 1, -2 ];
+  glBindFBO(fbo1);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(glareFbo), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  1, -2 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo2.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 2, -4 ];
+  glBindFBO(fbo2);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -4 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo1.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo2.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 2, -5 ];
+  glBindFBO(fbo1);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -5 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  glareFbo.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 2, -4 ];
+  glBindFBO(glareFbo);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -4 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   // Blur
-  fbo1.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = laserFbo.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 1, 1 ];
+  glBindFBO(fbo1);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(laserFbo), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  1, 1 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo2.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ -1, 1 ];
+  glBindFBO(fbo2);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  -1, 1 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo1.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo2.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 1.5, 0 ];
+  glBindFBO(fbo1);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  1.5, 0 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  fbo2.bind();
-  blur1dShader.bind();
-  blur1dShader.uniforms.t = fbo1.color[0].bind(0);
-  blur1dShader.uniforms.dim = [ W, H ];
-  blur1dShader.uniforms.dir = [ 0, 1.5 ];
+  glBindFBO(fbo2);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  0, 1.5 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  fbo1.bind();
-  persistenceShader.bind();
-  persistenceShader.uniforms.t = fbo2.color[0].bind(0);
-  persistenceShader.uniforms.r = persistenceFbo.color[0].bind(1);
+  glBindFBO(fbo1);
+  glBindShader(persistenceShader);
+  gl.uniform1i(glUniformLocation(persistenceShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
+  gl.uniform1i(glUniformLocation(persistenceShader, "r"), glBindTexture(glGetFBOTexture(persistenceFbo), 1));
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  persistenceFbo.bind();
-  copyShader.bind();
-  copyShader.uniforms.t = fbo1.color[0].bind(0);
+  glBindFBO(persistenceFbo);
+  glBindShader(copyShader);
+  gl.uniform1i(glUniformLocation(copyShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.viewport(0, 0, W, H);
-  gameShader.bind();
-  gameShader.uniforms.g = laserFbo.color[0].bind(0);
-  gameShader.uniforms.r = persistenceFbo.color[0].bind(1);
-  gameShader.uniforms.b = fbo2.color[0].bind(2);
-  gameShader.uniforms.l = glareFbo.color[0].bind(3);
-  gameShader.uniforms.e = playerFbo.color[0].bind(4);
+  gl.viewport(0, 0, W, H); // FIXME: we can do this once for all time (invariant)
+  glBindShader(gameShader);
+  gl.uniform1i(glUniformLocation(gameShader, "g"), glBindTexture(glGetFBOTexture(laserFbo), 0));
+  gl.uniform1i(glUniformLocation(gameShader, "r"), glBindTexture(glGetFBOTexture(persistenceFbo), 1));
+  gl.uniform1i(glUniformLocation(gameShader, "b"), glBindTexture(glGetFBOTexture(fbo2), 2));
+  gl.uniform1i(glUniformLocation(gameShader, "l"), glBindTexture(glGetFBOTexture(glareFbo), 3));
+  gl.uniform1i(glUniformLocation(gameShader, "e"), glBindTexture(glGetFBOTexture(playerFbo), 4));
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
