@@ -1,4 +1,7 @@
 
+cat src/path.js
+cat src/font.js
+cat src/webgl-utils.js
 cat src/jsfxr.js
 
 cd build;

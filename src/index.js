@@ -1,3 +1,32 @@
+/* global
+font,
+path,
+glCreateFBO,
+glCreateShader,
+glCreateTexture,
+glUniformLocation,
+glBindFBO,
+glBindShader,
+glGetFBOTexture,
+glBindTexture,
+glSetTexture
+c,
+d,
+u,
+g,
+STATIC_VERT,
+BLUR1D_FRAG,
+COPY_FRAG,
+GAME_FRAG,
+GLARE_FRAG,
+LASER_FRAG,
+PERSISTENCE_FRAG,
+PLAYER_FRAG,
+jsfxr
+*/
+
+
+
 /* TODO list
 - BUG: fix the velocity (to cartesian)
 - ai
@@ -32,71 +61,10 @@ u.height = FH;
 
 // set up WebGL layer
 
-// webgl utilities **SPECIFIC** to the game
 
-function glCreateShader (vert, frag) {
-  var handle, type = gl.VERTEX_SHADER, src = vert;
-  handle = gl.createShader(type);
-  gl.shaderSource(handle, src);
-  gl.compileShader(handle);
-  var vertex = handle;
+// WebGL setup
 
-  type = gl.FRAGMENT_SHADER;
-  src = frag;
-  handle = gl.createShader(type);
-  gl.shaderSource(handle, src);
-  gl.compileShader(handle);
-  var fragment = handle;
-
-  var program = gl.createProgram();
-  gl.attachShader(program, vertex);
-  gl.attachShader(program, fragment);
-  gl.linkProgram(program);
-  gl.useProgram(program);
-  var p = gl.getAttribLocation(program, "p");
-  gl.enableVertexAttribArray(p);
-  gl.vertexAttribPointer(p, 2, gl.FLOAT, false, 0, 0);
-  return [program];
-}
-function glBindShader (shader) {
-  gl.useProgram(shader[0]);
-}
-function glUniformLocation(shader, name) {
-  return shader[name] || (shader[name] = gl.getUniformLocation(shader[0], name));
-}
-function glCreateTexture () {
-  var tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  return tex;
-}
-function glSetTexture (t, value) {
-  gl.bindTexture(gl.TEXTURE_2D, t);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, value);
-}
-function glBindTexture (t, unit) {
-  gl.activeTexture(gl.TEXTURE0 + unit);
-  gl.bindTexture(gl.TEXTURE_2D, t);
-  return unit;
-}
-function glCreateFBO () {
-  var handle = gl.createFramebuffer();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, handle);
-  var color = glCreateTexture();
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, color, 0);
-  return [handle, color];
-}
-function glBindFBO (fbo) {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[0]);
-}
-function glGetFBOTexture (fbo) {
-  return fbo[1];
-}
-
+gl.viewport(0, 0, W, H);
 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
 var buffer = gl.createBuffer();
@@ -111,11 +79,13 @@ gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
 ]), gl.STATIC_DRAW);
 
 var blur1dShader = glCreateShader(STATIC_VERT, BLUR1D_FRAG);
+gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
 var copyShader = glCreateShader(STATIC_VERT, COPY_FRAG);
 var laserShader = glCreateShader( STATIC_VERT, LASER_FRAG);
 var persistenceShader = glCreateShader(STATIC_VERT, PERSISTENCE_FRAG);
 var glareShader = glCreateShader(STATIC_VERT, GLARE_FRAG);
 var playerShader = glCreateShader(STATIC_VERT, PLAYER_FRAG);
+gl.uniform1f(glUniformLocation(playerShader, "S"), SEED);
 var gameShader = glCreateShader(STATIC_VERT, GAME_FRAG);
 
 var persistenceFbo = glCreateFBO();
@@ -127,21 +97,21 @@ var fbo2 = glCreateFBO();
 
 var textureGame = glCreateTexture();
 
+
+
+/// GAME STATE
+
 var t = 0, dt;
 
-// GAME STATE
 var spaceship = [ W/2, H/2, 0, 0 ]; // [x, y, rot, vel]
 var asteroids = []; // array of [x, y, rot, vel, shape, lvl]
 // var aliens = []; // array of [x, y, rot, vel]
 var bullets = []; // array of [x, y, rot, vel, life, isAlien]
-
 var incomingObjects = []; // array of: [pos, vel, ang, force, rotVel, shape, lvl, key]
-
 var particles = []; // array of [x, y, rot, vel, life]
 
 var dying = 0;
 var resurrectionTime = 0;
-
 var best = 0;
 var score = 0;
 var scoreForLife = 0;
@@ -288,21 +258,6 @@ function euclidPhysics (obj) {
   obj[1] += obj[3] * dt;
 }
 */
-
-function path (pts, noclose) {
-  ctx.beginPath();
-  var mv = 1;
-  for (var i = 0; pts && i<pts.length; ++i) {
-    var p = pts[i];
-    if (p) {
-      if (mv) ctx.moveTo(p[0], p[1]);
-      else ctx.lineTo(p[0], p[1]);
-      mv = 0;
-    }
-    else mv = 1;
-  }
-  if (!noclose) ctx.closePath();
-}
 
 function polarPhysics (obj) {
   var x = Math.cos(obj[2]);
@@ -646,28 +601,28 @@ function drawParticle (o) {
   ctx.fill();
 }
 function drawGameUI () {
-  save();
+  ctx.save();
   ctx.fillStyle = ctx.strokeStyle = "#0f0";
   ctx.globalAlpha = 0.3;
 
 
-  save();
+  ctx.save();
   ctx.translate(W/2, 20);
   font(scoreTxt(best), .6);
-  restore();
+  ctx.restore();
 
-  save();
+  ctx.save();
   ctx.translate(30, 20);
   font(scoreTxt(score), 1.5, 1);
-  restore();
+  ctx.restore();
 
   if (playingSince < 0) {
-    save();
+    ctx.save();
     ctx.translate(W-30, 20);
     font(scoreTxt(0), 1.5, -1);
-    restore();
+    ctx.restore();
 
-    save();
+    ctx.save();
     ctx.translate(W/2 - 160, 0.7*H);
     path([
       [0,2],
@@ -684,11 +639,11 @@ function drawGameUI () {
     ctx.stroke();
     ctx.translate(40,0);
     font("PLAY", 2, 1);
-    restore();
+    ctx.restore();
   }
   else {
     for (var i=1; i<lifes; i++) {
-      save();
+      ctx.save();
       ctx.translate(40 + i * 10, 50);
       ctx.rotate(-Math.PI/2);
       path([
@@ -698,25 +653,25 @@ function drawGameUI () {
         [ -3, 0]
       ]);
       ctx.stroke();
-      restore();
+      ctx.restore();
     }
   }
   if (dying && lifes==1) {
-    save();
+    ctx.save();
     ctx.lineWidth = 2;
     ctx.translate(W/2, 140);
     font("GAME OVER", 2);
-    restore();
+    ctx.restore();
   }
-  save();
+  ctx.save();
   ctx.translate(W/2, H-14);
   font("2015 GREWEB INC", .6);
-  restore();
-  restore();
+  ctx.restore();
+  ctx.restore();
 }
 
 function drawGlitch () {
-  save();
+  ctx.save();
   ctx.fillStyle =
   ctx.strokeStyle = "#f00";
   ctx.globalAlpha = 0.03;
@@ -734,15 +689,7 @@ function drawGlitch () {
   ctx.beginPath();
   ctx.arc(0, 0, 12, 1, 2);
   ctx.stroke();
-  restore();
-  /*
-  float destroyed () {
-    vec2 ratio = vec2(1.0, dim.x / dim.y);
-    float d = distance(uv/ratio, vec2(0.5)/ratio);
-    return step(d, 0.008) +
-    step(0.023, d) * step(d, 0.026);
-  }
-  */
+  ctx.restore();
 }
 
 //// UI
@@ -754,17 +701,11 @@ function drawInc (o) {
   ctx.strokeStyle = "#9cf";
   var pts = o[5];
 
-  save();
+  ctx.save();
   ctx.globalAlpha = 0.4 + 0.6 * o[3] / 60;
   ctx.rotate(rot);
   var mx = 60 + 10 * o[6];
   var x = o[3] + 10 * o[6];
-  /*
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(mx, 0);
-  ctx.stroke();
-  */
   ctx.beginPath();
   ctx.lineWidth = 2;
   ctx.moveTo(0, 0);
@@ -777,16 +718,12 @@ function drawInc (o) {
     [ mx - r, -r ]
   ], 1);
   ctx.stroke();
-  restore();
+  ctx.restore();
 
-  save();
+  ctx.save();
   path(pts);
   ctx.fill();
-  /*
-  ctx.strokeStyle = "#000";
-  ctx.stroke();
-  */
-  restore();
+  ctx.restore();
 
   var sum = [0, 0];
   pts.forEach(function (p) {
@@ -807,223 +744,6 @@ function drawUI () {
   ctx.fillText((player*25)+" ¢", GAME_MARGIN, 40);
 }
 
-var FONT0 = [ // 0
-  [0, 0],
-  [2, 0],
-  [2, 2],
-  [0, 2],
-  [0, 0]
-];
-var FONT = [
-  FONT0,
-  [ // 1
-    [1, 0],
-    [1, 2]
-  ],
-  [ // 2
-    [0, 0],
-    [2, 0],
-    [2, 1],
-    [0, 1],
-    [0, 2],
-    [2, 2]
-  ],
-  [ // 3
-    [0, 0],
-    [2, 0],
-    [2, 2],
-    [0, 2],
-    ,
-    [0, 1],
-    [2, 1]
-  ],
-  [ // 4
-    [0, 0],
-    [0, 1],
-    [2, 1],
-    ,
-    [2, 0],
-    [2, 2]
-  ],
-  [ // 5
-    [2, 0],
-    [0, 0],
-    [0, 1],
-    [2, 1],
-    [2, 2],
-    [0, 2]
-  ],
-  [ // 6
-    [0, 0],
-    [0, 2],
-    [2, 2],
-    [2, 1],
-    [0, 1]
-  ],
-  [ // 7
-    [0, 0],
-    [2, 0],
-    [2, 2]
-  ],
-  [ // 8
-    [0, 0],
-    [2, 0],
-    [2, 2],
-    [0, 2],
-    [0, 0],
-    ,
-    [0, 1],
-    [2, 1]
-  ],
-  [ // 9
-    [2, 2],
-    [2, 0],
-    [0, 0],
-    [0, 1],
-    [2, 1]
-  ]
-];
-[
-  [// A
-    [0,2],
-    [0,2/3],
-    [1,0],
-    [2,2/3],
-    [2,2],
-    ,
-    [0,4/3],
-    [2,4/3]
-  ],
-  [ // B
-    [0, 1],
-    [0, 0],
-    [4/3,0],
-    [2,1/3],
-    [2,2/3],
-    [4/3,1],
-    [0,1],
-    [0,2],
-    [4/3,2],
-    [2,5/3],
-    [2,4/3],
-    [4/3,1]
-  ],
-  [// C
-    [2,0],
-    [0,0],
-    [0,2],
-    [2,2]
-  ],
-  ,// D
-  [// E
-    [2,0],
-    [0,0],
-    [0,2],
-    [2,2],
-    ,
-    [0,1],
-    [1.5,1]
-  ],
-  ,// F
-  [// G
-    [2,2/3],
-    [2,0],
-    [0,0],
-    [0,2],
-    [2,2],
-    [2,4/3],
-    [1,4/3]
-  ],
-  ,// H
-  [// I
-    [0,0],
-    [2,0],
-    ,
-    [1,0],
-    [1,2],
-    ,
-    [0,2],
-    [2,2]
-  ],
-  ,// J
-  ,// K
-  [// L
-    [0,0],
-    [0,2],
-    [2,2]
-  ],
-  [// M
-    [0,2],
-    [0,0],
-    [1,2/3],
-    [2,0],
-    [2,2]
-  ],
-  [// N
-    [0,2],
-    [0,0],
-    [2,2],
-    [2,0]
-  ],
-  FONT0,// O
-  [// P
-    [0,2],
-    [0,0],
-    [2,0],
-    [2,1],
-    [0,1]
-  ],
-  ,// Q
-  [// R
-    [0,2],
-    [0,0],
-    [2,0],
-    [2,1],
-    [0,1],
-    [2,2]
-  ],
-  ,// S
-  ,// T
-  ,// U
-  [// V
-    [0,0],
-    [1,2],
-    [2,0]
-  ],
-  [// W
-    [0,0],
-    [0,2],
-    [1,4/3],
-    [2,2],
-    [2,0]
-  ],
-  ,// X
-  [// Y
-    [0,0],
-    [1,2/3],
-    [2,0],
-    ,
-    [1,2/3],
-    [1,2]
-  ],
-  ,// Z
-].forEach(function (c, i) {
-  FONT[String.fromCharCode(65+i)] = c;
-});
-
-// oO ASTEROIDS font with fontSize and align (-1:right, 0:center, 1:left)
-// will side effect some ctx.translate() (that you could benefit to make text follow)
-function font (txt, fontSize, align) {
-  var l = fontSize*11*txt.length;
-  ctx.translate(align ? (align>0 ? 0 : -l) : -l/2, 0);
-  for (var i=0; i<txt.length; i++) {
-    path(FONT[txt[i]] && FONT[txt[i]].map(function (o) {
-      return o && [4*fontSize*o[0], 5*fontSize*o[1]];
-    }), 1);
-    ctx.stroke();
-    ctx.translate(fontSize*11, 0);
-  }
-}
 
 function scoreTxt (s) {
   return (s<=9?"0":"")+s;
@@ -1031,25 +751,17 @@ function scoreTxt (s) {
 
 // Game Post Effects
 
-
 // Main Code
 
 function translateTo (p) {
   ctx.translate(p[0], p[1]);
 }
-function save () {
-  ctx.save();
-}
-function restore () {
-  ctx.restore();
-}
-
 function renderCollection (coll, draw) {
   for (var i=0; i<coll.length; ++i) {
-    save();
+    ctx.save();
     translateTo(coll[i]);
     draw(coll[i]);
-    restore();
+    ctx.restore();
   }
 }
 
@@ -1062,15 +774,19 @@ function render (_t) {
 
   t += dt; // accumulate the game time (that is not the same as _t)
 
+  // UPDATE game
+
   update();
+
+  // RENDER game
 
   // UI Rendering
 
   ctx = uiCtx;
 
-  save();
+  ctx.save();
 
-  save();
+  ctx.save();
   ctx.clearRect(0, 0, FW, FH);
 
   drawUI();
@@ -1078,26 +794,26 @@ function render (_t) {
   ctx.translate(GAME_MARGIN, GAME_MARGIN);
 
   incomingObjects.forEach(function (inc) {
-    save();
+    ctx.save();
     translateTo(incPosition(inc));
     drawInc(inc);
-    restore();
+    ctx.restore();
   });
 
-  restore();
+  ctx.restore();
 
-  restore();
+  ctx.restore();
 
   // Game rendering
 
   ctx = gameCtx;
 
-  save();
+  ctx.save();
 
-  save();
+  ctx.save();
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
-  restore();
+  ctx.restore();
 
   renderCollection(asteroids, drawAsteroid);
   //renderCollection(aliens, drawAlien);
@@ -1105,58 +821,52 @@ function render (_t) {
   renderCollection(particles, drawParticle);
 
   if (playingSince > 0) {
-    save();
+    ctx.save();
     translateTo(spaceship);
     drawSpaceship(spaceship);
-    restore();
+    ctx.restore();
   }
 
   drawGameUI();
 
   drawGlitch();
 
-  restore();
+  ctx.restore();
 
   // WEBGL after effects
 
   glSetTexture(textureGame, g);
 
+  // Laser
   glBindFBO(laserFbo);
   glBindShader(laserShader);
   gl.uniform1i(glUniformLocation(laserShader, "t"), glBindTexture(textureGame, 0));
-
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-
+  // Player / env
   glBindFBO(playerFbo);
   glBindShader(playerShader);
   gl.uniform1f(glUniformLocation(playerShader, "pt"), playingSince / 1000);
   gl.uniform1f(glUniformLocation(playerShader, "pl"), player);
-  gl.uniform1f(glUniformLocation(playerShader, "S"), SEED);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(playerFbo), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  6, 0 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo2);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  0, 2 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, 1 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(playerFbo);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -1 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -1168,25 +878,21 @@ function render (_t) {
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(glareFbo), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  1, -2 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo2);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -4 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -5 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(glareFbo);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -4 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -1194,28 +900,25 @@ function render (_t) {
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(laserFbo), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  1, 1 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo2);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  -1, 1 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  1.5, 0 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo2);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dim"), W, H);
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  0, 1.5 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+  // Persistence
   glBindFBO(fbo1);
   glBindShader(persistenceShader);
   gl.uniform1i(glUniformLocation(persistenceShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
@@ -1226,8 +929,8 @@ function render (_t) {
   gl.uniform1i(glUniformLocation(copyShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+  // Final draw
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.viewport(0, 0, W, H); // FIXME: we can do this once for all time (invariant)
   glBindShader(gameShader);
   gl.uniform1i(glUniformLocation(gameShader, "g"), glBindTexture(glGetFBOTexture(laserFbo), 0));
   gl.uniform1i(glUniformLocation(gameShader, "r"), glBindTexture(glGetFBOTexture(persistenceFbo), 1));
@@ -1238,7 +941,6 @@ function render (_t) {
 }
 
 requestAnimationFrame(render);
-
 
 
 /*
