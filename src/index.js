@@ -103,7 +103,7 @@ var textureGame = glCreateTexture();
 
 var t = 0, dt;
 
-var spaceship = [ W/2, H/2, 0, 0 ]; // [x, y, rot, vel]
+var spaceship = [ W/2, H/2, 0, 0, 0 ]; // [x, y, velx, vely, rot]
 var asteroids = []; // array of [x, y, rot, vel, shape, lvl]
 // var aliens = []; // array of [x, y, rot, vel]
 var bullets = []; // array of [x, y, rot, vel, life, isAlien]
@@ -252,12 +252,10 @@ function explodeAsteroid (j) {
 
 // GAME LOGIC
 
-/*
 function euclidPhysics (obj) {
   obj[0] += obj[2] * dt;
   obj[1] += obj[3] * dt;
 }
-*/
 
 function polarPhysics (obj) {
   var x = Math.cos(obj[2]);
@@ -437,6 +435,8 @@ function update () {
 
   // run spaceship AI
   if (!dying && playingSince > 0) {
+    var ax = Math.cos(spaceship[4]);
+    var ay = Math.sin(spaceship[4]);
 
     // ai logic (determine the 3 inputs)
 
@@ -449,26 +449,37 @@ function update () {
     if (!AIa && playingSince > 3000) {
       AIa = 1;
       AIboost = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? -1 : 1;
+      if (AIboost && Math.random() < 0.8) {
+        // Going opposite to velocity
+        if (ax > ay) AIboost = (ax<0) === (spaceship[2]<0) ? -1 : 1;
+        else AIboost = (ay<0) === (spaceship[3]<0) ? -1 : 1;
+      }
     }
     AIa = Math.random() < 0.0001 * dt;
 
     // apply ai inputs with game logic
 
-    spaceship[3] += AIboost * dt * 0.0002;
-    spaceship[2] += AIrotate * dt * 0.005;
+    spaceship[2] += AIboost * dt * 0.0002 * ax;
+    spaceship[3] += AIboost * dt * 0.0002 * ay;
+    spaceship[4] += AIrotate * dt * 0.005;
     if (nbSpaceshipBullets < 4) {
       if (AIshoot) {
-        var x = spaceship[0] + 14 * Math.cos(spaceship[2]);
-        var y = spaceship[1] + 14 * Math.sin(spaceship[2]);
-        bullets.push([ x, y, spaceship[2], spaceship[3] + 0.3, 1000, 0 ]);
+        bullets.push([
+          spaceship[0] + 14 * ax,
+          spaceship[1] + 14 * ay,
+          spaceship[2] + 0.3 * ax,
+          spaceship[3] + 0.3 * ay,
+          1000,
+          0
+        ]);
       }
     }
   }
 
-  polarPhysics(spaceship);
+  euclidPhysics(spaceship);
   asteroids.forEach(polarPhysics);
   //aliens.forEach(polarPhysics);
-  bullets.forEach(polarPhysics);
+  bullets.forEach(euclidPhysics);
   particles.forEach(polarPhysics);
 
   incomingObjects.forEach(applyIncLogic);
@@ -525,7 +536,7 @@ function incRotation (o) {
 function drawSpaceship (o) {
   ctx.strokeStyle = "#f00";
   ctx.globalAlpha = 0.4;
-  ctx.rotate(o[2]);
+  ctx.rotate(o[4]);
   if (dying) {
     ctx.lineWidth = 2;
     var delta = (t-dying)/200;
