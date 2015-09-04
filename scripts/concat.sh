@@ -1,4 +1,6 @@
 
+cat src/pre.js
+
 cat src/env.js
 cat src/path.js
 cat src/font.js
@@ -13,3 +15,5 @@ done
 cd ..;
 
 cat src/index.js
+
+cat src/post.js
