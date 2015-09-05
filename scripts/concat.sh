@@ -1,7 +1,12 @@
 
 cat src/pre.js
 
-cat src/env.js
+if [ "$NODE_ENV" == "production" ]; then
+  cat src/env_prod.js
+else
+  cat src/env_dev.js
+fi;
+
 cat src/path.js
 cat src/font.js
 cat src/webgl-utils.js
