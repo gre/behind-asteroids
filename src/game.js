@@ -24,7 +24,9 @@ GLARE_FRAG,
 LASER_FRAG,
 PERSISTENCE_FRAG,
 PLAYER_FRAG,
-jsfxr
+jsfxr,
+DEBUG,
+MOBILE
 */
 
 
@@ -40,12 +42,11 @@ var gl = c.getContext("webgl"),
   ctx,
   gameCtx = g.getContext("2d"),
   uiCtx = u.getContext("2d"),
-  mobile = "ontouchstart" in document,
-  FW = mobile ? 600 : 800,
-  FH = mobile ? 700 : 680,
-  GAME_MARGIN = mobile ? 80 : 120,
-  GAME_TOP_MARGIN = mobile ? 140 : GAME_MARGIN,
-  GAME_INC_PADDING = 80,
+  FW = MOBILE ? 480 : 800,
+  FH = MOBILE ? 600 : 680,
+  GAME_MARGIN = MOBILE ? 50 : 120,
+  GAME_TOP_MARGIN = MOBILE ? 140 : GAME_MARGIN,
+  GAME_INC_PADDING = MOBILE ? 40 : 80,
   W = FW - 2 * GAME_MARGIN,
   H = FH - GAME_MARGIN - GAME_TOP_MARGIN,
   borderLength = 2*(W+H+2*GAME_INC_PADDING),
@@ -58,7 +59,7 @@ g.height = c.height = H;
 c.style.top = GAME_TOP_MARGIN + "px";
 c.style.left = GAME_MARGIN + "px";
 
-var uiScale = devicePixelRatio;
+var uiScale = MOBILE ? 1 : devicePixelRatio; // MOBILE is just too slow to do devicePixelRatio..
 u.width = FW * uiScale;
 u.height = FH * uiScale;
 u.style.width = FW + "px";
@@ -68,6 +69,7 @@ var lastHalf = 0;
 function checkSize () {
   var half = Math.floor((innerHeight-FH)/2);
   if (half !== lastHalf) {
+    lastHalf = half;
     d.style.marginTop = half + "px";
   }
 }
@@ -141,8 +143,9 @@ var keys = {};
 for (var i=0; i<99; ++i) keys[i] = 0;
 var tap; // [x,y], is cleaned by the update loop
 
-if (mobile) {
+if (MOBILE) {
   addEventListener("touchstart", function (e) {
+    e.preventDefault();
     var r = c.getBoundingClientRect();
     e = e.changedTouches[0];
     var x = e.clientX-r.left;
@@ -523,22 +526,24 @@ function update () {
 
   // inc lifecycle
 
-  for (i = 0; i < incomingObjects.length;) {
-    var o = incomingObjects[i];
-    var p = incPosition(o);
-    var matchingTap = tap && circleCollides(tap, p, 40 + 10 * o[6]);
-    if (keys[o[7]] || matchingTap) {
-      // send an asteroid
-      keys[o[7]] = 0;
-      tap = 0;
-      sendAsteroid(o);
-      incomingObjects.splice(i, 1);
+  if (playingSince > 1000) {
+    for (i = 0; i < incomingObjects.length;) {
+      var o = incomingObjects[i];
+      var p = incPosition(o);
+      var matchingTap = tap && circleCollides(tap, p, 40 + 10 * o[6]);
+      if (keys[o[7]] || matchingTap) {
+        // send an asteroid
+        keys[o[7]] = 0;
+        tap = 0;
+        sendAsteroid(o);
+        incomingObjects.splice(i, 1);
+      }
+      else i++;
     }
-    else i++;
-  }
-  tap = 0;
+    tap = 0;
 
-  while(maybeCreateInc());
+    while(maybeCreateInc());
+  }
 
   // spaceship lifecycle
 
@@ -591,7 +596,7 @@ function update () {
         explose(bull);
         bullets.splice(i, 1);
         explodeAsteroid(j);
-        var s = 10 * Math.floor(0.4 * (6 - lvl) * (6 - lvl));
+        var s = 20 * Math.floor(0.4 * (6 - lvl) * (6 - lvl));
         score += s;
         scoreForLife += s;
         if (scoreForLife > 10000) {
@@ -962,7 +967,7 @@ function drawInc (o) {
     sum[1] += p[1];
   });
 
-  if (!mobile) {
+  if (!MOBILE) {
     ctx.save();
     ctx.lineStyle = "#7cf";
     ctx.translate(sum[0]/o[5].length+1, sum[1]/o[5].length-5);
@@ -1057,23 +1062,23 @@ function drawUI () {
   }
 
   ctx.save();
-  ctx.translate(FW - GAME_MARGIN, 20);
+  ctx.translate(FW - GAME_MARGIN, 10);
   ctx.lineWidth = 2;
   ctx.strokeStyle = "#7cf";
   font((player*25)+"¢", 2, -1);
   ctx.restore();
 
   ctx.save();
-  ctx.translate(GAME_MARGIN, 20);
+  ctx.translate(GAME_MARGIN, MOBILE ? 50 : 0);
   ctx.lineWidth = (t%600>300) ? 2 : 1;
   ctx.save();
   ctx.strokeStyle = currentMessageClr;
-  font(currentMessage, mobile ? 1.5 : 2, 1);
+  font(currentMessage, MOBILE ? 1.5 : 2, 1);
   ctx.restore();
   ctx.save();
   ctx.strokeStyle = currentMessageClr2;
-  ctx.translate(0, mobile ? 30 : 40);
-  font(currentMessage2, mobile ? 1.5 : 2, 1);
+  ctx.translate(0, MOBILE ? 30 : 40);
+  font(currentMessage2, MOBILE ? 1.5 : 2, 1);
   ctx.restore();
   ctx.restore();
 }
@@ -1105,7 +1110,7 @@ function render (_t) {
   if (!_lastT) _lastT = _t;
   dt = Math.min(100, _t-_lastT);
   _lastT = _t;
-  
+
   checkSize();
 
   t += dt; // accumulate the game time (that is not the same as _t)
@@ -1131,7 +1136,7 @@ function render (_t) {
 
   ctx.translate(GAME_MARGIN, GAME_TOP_MARGIN);
 
-  incomingObjects.forEach(function (inc) {
+  if (playingSince>0) incomingObjects.forEach(function (inc) {
     ctx.save();
     translateTo(incPosition(inc));
     drawInc(inc);
