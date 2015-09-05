@@ -12,6 +12,7 @@ cat src/path.js
 cat src/font.js
 cat src/webgl-utils.js
 cat src/jsfxr.js
+cat src/audio.js
 
 cd build;
 for glsl in *.vert *.frag; do

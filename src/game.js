@@ -1,32 +1,33 @@
 /* global
-smoothstep,
-normAngle,
-font,
-path,
-glCreateFBO,
-glCreateShader,
-glCreateTexture,
-glUniformLocation,
-glBindFBO,
-glBindShader,
-glGetFBOTexture,
-glBindTexture,
-glSetTexture
-c,
-d,
-u,
-g,
-STATIC_VERT,
-BLUR1D_FRAG,
-COPY_FRAG,
-GAME_FRAG,
-GLARE_FRAG,
-LASER_FRAG,
-PERSISTENCE_FRAG,
-PLAYER_FRAG,
-jsfxr,
-DEBUG,
+DEBUG
 MOBILE
+smoothstep
+normAngle
+font
+path
+glCreateFBO
+glCreateShader
+glCreateTexture
+glUniformLocation
+glBindFBO
+glBindShader
+glGetFBOTexture
+glBindTexture
+glSetTexture
+c
+d
+u
+g
+STATIC_VERT
+BLUR1D_FRAG
+COPY_FRAG
+GAME_FRAG
+GLARE_FRAG
+LASER_FRAG
+PERSISTENCE_FRAG
+PLAYER_FRAG
+audio
+play
 */
 
 
@@ -73,6 +74,21 @@ function checkSize () {
     d.style.marginTop = half + "px";
   }
 }
+
+// sounds
+
+// TODO: async?
+
+var Ashot = audio([0,0.06,0.18,,0.33,0.5,0.23,-0.04,-0.24,,,-0.02,,0.37,-0.2199,,,,0.8,,,,,0.3]);
+
+var Amusic1 = audio([,,0.12,,0.13,0.16,,,,,,,,,,,,,0.7,,,,,0.5]);
+var Amusic2 = audio([,,0.12,,0.13,0.165,,,,,,,,,,,,,0.7,,,,,0.5]);
+
+var Aexplosion1 = audio([3,,0.35,0.5369,0.5,0.15,,-0.02,,,,-0.7444,0.78,,,0.7619,,,0.1,,,,,0.5]);
+var Aexplosion2 = audio([3,,0.38,0.5369,0.52,0.18,,-0.02,,,,-0.7444,0.78,,,0.7619,,,0.1,,,,,0.5]);
+
+var Asend = audio([2,0.07,0.04,,0.24,0.25,,0.34,-0.1999,,,-0.02,,0.3187,,,-0.14,0.04,0.85,,0.28,0.63,,0.4]);
+var Alost = audio([0,0.11,0.37,,0.92,0.15,,-0.06,-0.04,0.29,0.14,0.1,,0.5047,,,,,0.16,-0.02,,,,0.3]);
 
 // set up WebGL layer
 
@@ -174,6 +190,7 @@ function sendAsteroid (o) {
   var lvl = o[6];
   var shape = o[5];
   asteroids.push([ x, y, rot, vel, shape, lvl ]);
+  play(Asend);
 }
 
 function randomAsteroids () {
@@ -261,6 +278,7 @@ function randomAsteroidShape (lvl) {
 }
 
 function explose (o) {
+  play(Math.random()<0.5 ? Aexplosion1 : Aexplosion2);
   var n = Math.floor(9 + 9 * Math.random());
   for (var i = 0; i < n; ++i) {
     var l = 20 * Math.random();
@@ -501,10 +519,29 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
   }
 }
 
+var musicPhase = 0;
+var musicTick = 0;
+var musicFreq = 0.3;
+var musicPaused = 0;
 
 function update () {
   var i;
   var nbSpaceshipBullets = 0;
+
+  if (!dying && playingSince>0 && t-musicPaused>5000) {
+    musicFreq *= 1 + 0.00003*dt;
+
+    if (musicFreq > 2) {
+      musicFreq = 0.3;
+      musicPaused = t;
+    }
+
+    musicPhase += musicFreq*2*Math.PI*dt/1000;
+    if ((Math.sin(musicPhase) > 0) !== musicTick) {
+      musicTick = !musicTick;
+      play(musicTick ? Amusic1 : Amusic2);
+    }
+  }
 
   // randomly send some asteroids
   if (Math.random() < 0.001 * dt)
@@ -522,6 +559,8 @@ function update () {
     score = 0;
     scoreForLife = 0;
     asteroids = [];
+    musicFreq = 0.3;
+    musicPaused = t;
   }
 
   // inc lifecycle
@@ -557,6 +596,7 @@ function update () {
       // Player lost. game over
       playingSince = -5000;
       randomAsteroids();
+      play(Alost);
     }
   }
 
@@ -649,6 +689,7 @@ function update () {
     spaceship[4] = normAngle(spaceship[4] + AIrotate * dt * 0.005);
     if (nbSpaceshipBullets < 4) {
       if (AIshoot) {
+        play(Ashot);
         bullets.push([
           spaceship[0] + 14 * ax,
           spaceship[1] + 14 * ay,
@@ -794,10 +835,9 @@ function drawBullet () {
   ctx.fill();
 }
 
-function drawParticle (o) {
+function drawParticle () {
   ctx.globalAlpha = 0.8;
-  ctx.strokeStyle = "#f00";
-  ctx.rotate(o[2]);
+  ctx.fillStyle = "#f00";
   ctx.beginPath();
   ctx.arc(0, 0, 1, 0, 2*Math.PI);
   ctx.fill();
@@ -995,7 +1035,7 @@ function drawUI () {
       currentMessage2 = "PLAYERS WASTE THEIR MONEY";
     }
     else {
-      var nb = Math.min(15, Math.floor((playingSince+3500)/100));
+      var nb = Math.min(25, Math.floor((playingSince+3500)/80));
       for (var i=0; i<nb; i++)
         currentMessage += ".";
       if (playingSince>-2000)
@@ -1291,7 +1331,6 @@ requestAnimationFrame(render);
 
 if (DEBUG) {
   playingSince=-1;
-
 /*
   setTimeout(function () {
     setInterval(function () {
