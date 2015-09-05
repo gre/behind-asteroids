@@ -57,8 +57,12 @@ g.width = c.width = W;
 g.height = c.height = H;
 c.style.top = GAME_MARGIN + "px";
 c.style.left = GAME_MARGIN + "px";
-u.width = FW;
-u.height = FH;
+
+var uiScale = 2;
+u.width = FW * uiScale;
+u.height = FH * uiScale;
+u.style.width = FW + "px";
+u.style.height = FW + "px";
 
 // set up WebGL layer
 
@@ -116,7 +120,7 @@ var t = 0, dt,
   best = 0,
   score = 0,
   scoreForLife = 0,
-  playingSince = -5000,
+  playingSince = -10000,
   deads = 0,
   player = 0,
   lifes = 0,
@@ -183,11 +187,11 @@ function maybeCreateInc () {
   var sum = incomingObjects.reduce(function (sum, o) {
     return o[6];
   }, 0);
-  var probabilityCreateInc = dt * 0.03 *
+  if (Math.random() < 0.05 * dt *
     Math.exp(-sum*2) *
-    (1 + player / 3 - Math.exp(-playingSince / 60000));
-  if (Math.random() > probabilityCreateInc) return;
-  return createInc();
+    (1 + player / 3 - Math.exp(-playingSince / 60000))
+  )
+    return createInc();
 }
 
 function createInc () {
@@ -675,10 +679,14 @@ function incPosition (o) {
   return [ -GAME_INC_PADDING/2 + x, -GAME_INC_PADDING/2 + y ];
 }
 
-function incRotation (o) {
+function incRotationCenter (o) {
   var p = incPosition(o);
   var toCenter = Math.atan2(spaceship[1] - p[1], spaceship[0] - p[0]);
-  return Math.cos(o[2]) * o[8] + toCenter;
+  return toCenter;
+}
+
+function incRotation (o) {
+  return Math.cos(o[2]) * o[8] + incRotationCenter(o);
   //return o[2];
 }
 
@@ -857,21 +865,53 @@ function drawGlitch () {
 //// UI
 
 function drawInc (o) {
-  var rot = incRotation(o);
+  var rotC = incRotationCenter(o);
+  var rot = Math.cos(o[2]) * o[8] + rotC;
+  var w = 10 * o[6];
 
-  ctx.fillStyle =
-  ctx.strokeStyle = "#9cf";
-  var pts = o[5];
+  ctx.lineWidth = 1+o[3]/60;
+  ctx.strokeStyle = "#7cf";
 
   ctx.save();
-  ctx.globalAlpha = 0.4 + 0.6 * o[3] / 60;
-  ctx.rotate(rot);
-  var mx = 60 + 10 * o[6];
-  var x = o[3] + 10 * o[6];
+  /*
+  ctx.fillStyle =
+  ctx.strokeStyle = "#469";
+  */
+  ctx.strokeStyle = "#469";
+  ctx.lineWidth = 1;
+  ctx.rotate(rotC);
   ctx.beginPath();
-  ctx.lineWidth = 2;
-  ctx.moveTo(0, 0);
-  ctx.lineTo(x, 0);
+  ctx.arc(0, 0, w+10, -o[8], o[8]);
+  ctx.stroke();
+  /*
+  ctx.beginPath();
+  ctx.arc(w+10, 0, 1, 0, 2*Math.PI);
+  ctx.fill();
+  */
+  ctx.strokeStyle = "#7cf";
+  path([
+    [w+8, 0],
+    [w+12, 0]
+  ]);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  //ctx.globalAlpha = 0.4 + 0.6 * o[3] / 60;
+  ctx.rotate(rot);
+  var mx = 60 + w;
+  var x = o[3] + w;
+  ctx.strokeStyle = "#469";
+  path([
+    [0,0],
+    [mx,0]
+  ]);
+  ctx.stroke();
+  ctx.strokeStyle = "#7cf";
+  path([
+    [0,0],
+    [x,0]
+  ]);
   ctx.stroke();
   var r = 6;
   path([
@@ -883,27 +923,78 @@ function drawInc (o) {
   ctx.restore();
 
   ctx.save();
-  path(pts);
+  path(o[5]);
+  ctx.fillStyle = "#000";
   ctx.fill();
+  ctx.stroke();
   ctx.restore();
 
   var sum = [0, 0];
-  pts.forEach(function (p) {
+  o[5].forEach(function (p) {
     sum[0] += p[0];
     sum[1] += p[1];
   });
 
-  ctx.font = "bold 16px sans-serif";
-  ctx.fillStyle = "#000";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(String.fromCharCode(o[7]), sum[0]/pts.length, sum[1]/pts.length);
+  ctx.save();
+  ctx.lineStyle = "#7cf";
+  ctx.translate(sum[0]/o[5].length+1, sum[1]/o[5].length-5);
+  font(String.fromCharCode(o[7]), 1);
+  ctx.restore();
 }
 
 function drawUI () {
-  ctx.fillStyle = "#adf";
-  ctx.font = "normal 32px sans-serif";
-  ctx.fillText((player*25)+" ¢", GAME_MARGIN, 40);
+  var currentMessage = "",
+    currentMessage2 = "",
+    currentMessageClr = "#f7c";
+
+  if (!player) {
+    if (playingSince<-5000) {
+      currentMessage = "WELCOME TO THE REAL";
+      currentMessage2 = "ASTEROIDS !!!";
+    }
+    else if (-5000<playingSince && playingSince<-1000) {
+      currentMessage = "SEND ASTEROIDS TO MAKE";
+      currentMessage2 = "PLAYERS WASTE THEIR MONEY";
+    }
+  }
+  else {
+    if (playingSince<3000) {
+      currentMessage = "PLAYER "+player;
+    }
+    if (playingSince<-1000) {
+      currentMessage = "INCOMING NEW PLAYER...";
+    }
+    else if (playingSince<0) {
+      currentMessage = "ONE MORE 25¢ COIN!";
+    }
+    if (dying && lifes===1) {
+      currentMessage = "GOOD JOB";
+    }
+    if (dying && lifes===2) {
+      currentMessage = "KILL IT";
+      currentMessage2 = "ONE MORE TIME !";
+    }
+  }
+
+  ctx.save();
+  ctx.translate(FW - GAME_MARGIN, 20);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#7cf";
+  font((player*25)+"¢", 2, -1);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(GAME_MARGIN, 20);
+  ctx.lineWidth = (t%600>300) ? 2 : 1;
+  ctx.strokeStyle = currentMessageClr;
+  ctx.save();
+  font(currentMessage, 2, 1);
+  ctx.restore();
+  ctx.save();
+  ctx.translate(0, 30);
+  font(currentMessage2, 2, 1);
+  ctx.restore();
+  ctx.restore();
 }
 
 
@@ -947,6 +1038,8 @@ function render (_t) {
   ctx = uiCtx;
 
   ctx.save();
+
+  ctx.scale(uiScale, uiScale);
 
   ctx.save();
   ctx.clearRect(0, 0, FW, FH);
@@ -1108,7 +1201,8 @@ requestAnimationFrame(render);
 
 
 // DEBUG
-/*
+
+playingSince=-1;
 setTimeout(function () {
   setInterval(function () {
     createInc();
@@ -1116,4 +1210,3 @@ setTimeout(function () {
     incomingObjects.splice(0, 1);
   }, 1000);
 }, 5000);
-*/
