@@ -1062,14 +1062,14 @@ function drawUI () {
   }
 
   ctx.save();
-  ctx.translate(FW - GAME_MARGIN, 10);
+  ctx.translate(FW - GAME_MARGIN, 2);
   ctx.lineWidth = 2;
   ctx.strokeStyle = "#7cf";
   font((player*25)+"¢", 2, -1);
   ctx.restore();
 
   ctx.save();
-  ctx.translate(GAME_MARGIN, MOBILE ? 50 : 0);
+  ctx.translate(GAME_MARGIN, MOBILE ? 40 : 2);
   ctx.lineWidth = (t%600>300) ? 2 : 1;
   ctx.save();
   ctx.strokeStyle = currentMessageClr;
