@@ -1027,7 +1027,7 @@ function drawUI () {
   if (!player) {
     if (playingSince<-7000) {
       currentMessage = "BEHIND ASTEROIDS";
-      currentMessage2 = "THE HIDDEN FACE";
+      currentMessage2 = "THE DARK SIDE";
     }
     else if (playingSince<-3500) {
       currentMessageClr = currentMessageClr2 = "#7cf";
