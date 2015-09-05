@@ -30,12 +30,8 @@ jsfxr
 
 
 /* TODO list
-- BUG: fix the velocity (to cartesian)
-- ai
-  - make a very good AI
-  - tweak this AI to make variant of difficulty (based on player number)
+- Polish the AI
 - audio
-- mobile
 - game features (if time)
   - UFO "bonus"
 */
@@ -44,12 +40,14 @@ var gl = c.getContext("webgl"),
   ctx,
   gameCtx = g.getContext("2d"),
   uiCtx = u.getContext("2d"),
-  FW = 800,
-  FH = 680,
-  GAME_MARGIN = 120,
+  mobile = "ontouchstart" in document,
+  FW = mobile ? 600 : 800,
+  FH = mobile ? 700 : 680,
+  GAME_MARGIN = mobile ? 80 : 120,
+  GAME_TOP_MARGIN = mobile ? 140 : GAME_MARGIN,
   GAME_INC_PADDING = 80,
   W = FW - 2 * GAME_MARGIN,
-  H = FH - 2 * GAME_MARGIN,
+  H = FH - GAME_MARGIN - GAME_TOP_MARGIN,
   borderLength = 2*(W+H+2*GAME_INC_PADDING),
   SEED = Math.random(),
   excitementSmoothed = 0;
@@ -57,17 +55,24 @@ var gl = c.getContext("webgl"),
 d.style.width = FW + "px";
 g.width = c.width = W;
 g.height = c.height = H;
-c.style.top = GAME_MARGIN + "px";
+c.style.top = GAME_TOP_MARGIN + "px";
 c.style.left = GAME_MARGIN + "px";
 
-var uiScale = 2;
+var uiScale = devicePixelRatio;
 u.width = FW * uiScale;
 u.height = FH * uiScale;
 u.style.width = FW + "px";
-u.style.height = FW + "px";
+u.style.height = FH + "px";
+
+var lastHalf = 0;
+function checkSize () {
+  var half = Math.floor((innerHeight-FH)/2);
+  if (half !== lastHalf) {
+    d.style.marginTop = half + "px";
+  }
+}
 
 // set up WebGL layer
-
 
 // WebGL setup
 
@@ -133,14 +138,26 @@ randomAsteroids();
 
 // user inputs
 var keys = {};
-
 for (var i=0; i<99; ++i) keys[i] = 0;
-document.addEventListener("keydown", function (e) {
-  keys[e.which] = 1;
-});
-document.addEventListener("keyup", function (e) {
-  keys[e.which] = 0;
-});
+var tap; // [x,y], is cleaned by the update loop
+
+if (mobile) {
+  addEventListener("touchstart", function (e) {
+    var r = c.getBoundingClientRect();
+    e = e.changedTouches[0];
+    var x = e.clientX-r.left;
+    var y = e.clientY-r.top;
+    tap = [ x, y ];
+  });
+}
+else {
+  addEventListener("keydown", function (e) {
+    keys[e.which] = 1;
+  });
+  addEventListener("keyup", function (e) {
+    keys[e.which] = 0;
+  });
+}
 
 // game actions
 
@@ -189,7 +206,7 @@ function maybeCreateInc () {
   var sum = incomingObjects.reduce(function (sum, o) {
     return o[6];
   }, 0);
-  if (Math.random() < 0.05 * dt *
+  if (Math.random() < 0.03 * dt *
     Math.exp(-sum*2) *
     (1 + player / 3 - Math.exp(-playingSince / 60000))
   )
@@ -508,13 +525,18 @@ function update () {
 
   for (i = 0; i < incomingObjects.length;) {
     var o = incomingObjects[i];
-    if (keys[o[7]]) {
+    var p = incPosition(o);
+    var matchingTap = tap && circleCollides(tap, p, 40 + 10 * o[6]);
+    if (keys[o[7]] || matchingTap) {
       // send an asteroid
+      keys[o[7]] = 0;
+      tap = 0;
       sendAsteroid(o);
       incomingObjects.splice(i, 1);
     }
     else i++;
   }
+  tap = 0;
 
   while(maybeCreateInc());
 
@@ -940,11 +962,13 @@ function drawInc (o) {
     sum[1] += p[1];
   });
 
-  ctx.save();
-  ctx.lineStyle = "#7cf";
-  ctx.translate(sum[0]/o[5].length+1, sum[1]/o[5].length-5);
-  font(String.fromCharCode(o[7]), 1);
-  ctx.restore();
+  if (!mobile) {
+    ctx.save();
+    ctx.lineStyle = "#7cf";
+    ctx.translate(sum[0]/o[5].length+1, sum[1]/o[5].length-5);
+    font(String.fromCharCode(o[7]), 1);
+    ctx.restore();
+  }
 }
 
 var lastStatement, lastStatementTime = 0;
@@ -1015,7 +1039,7 @@ function drawUI () {
         currentMessage2 = lastStatement;
       }
       else {
-        lastStatement = null;
+        lastStatement = 0;
         if (Math.random() < 0.0001 * dt && t - lastStatementTime > 8000) {
           currentMessage2 = [
             "COME ON! KILL IT!",
@@ -1044,12 +1068,12 @@ function drawUI () {
   ctx.lineWidth = (t%600>300) ? 2 : 1;
   ctx.save();
   ctx.strokeStyle = currentMessageClr;
-  font(currentMessage, 2, 1);
+  font(currentMessage, mobile ? 1.5 : 2, 1);
   ctx.restore();
   ctx.save();
   ctx.strokeStyle = currentMessageClr2;
-  ctx.translate(0, 30);
-  font(currentMessage2, 2, 1);
+  ctx.translate(0, mobile ? 30 : 40);
+  font(currentMessage2, mobile ? 1.5 : 2, 1);
   ctx.restore();
   ctx.restore();
 }
@@ -1081,6 +1105,8 @@ function render (_t) {
   if (!_lastT) _lastT = _t;
   dt = Math.min(100, _t-_lastT);
   _lastT = _t;
+  
+  checkSize();
 
   t += dt; // accumulate the game time (that is not the same as _t)
 
@@ -1103,7 +1129,7 @@ function render (_t) {
 
   drawUI();
 
-  ctx.translate(GAME_MARGIN, GAME_MARGIN);
+  ctx.translate(GAME_MARGIN, GAME_TOP_MARGIN);
 
   incomingObjects.forEach(function (inc) {
     ctx.save();
@@ -1259,7 +1285,7 @@ requestAnimationFrame(render);
 
 
 if (DEBUG) {
-  //playingSince=-1;
+  playingSince=-1;
 
 /*
   setTimeout(function () {

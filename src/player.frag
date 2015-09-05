@@ -12,7 +12,7 @@ float disc (vec2 c, vec2 r) {
 }
 float squircle (vec2 c, vec2 r, float p) {
   vec2 v = (uv - c) / r;
-  return step(pow(v.x, p) + pow(v.y, p), 1.0);
+  return step(pow(abs(v.x), p) + pow(abs(v.y), p), 1.0);
 }
 
 vec3 env () {
@@ -29,7 +29,7 @@ vec4 player (float p, float dx) {
     mix(min(ex, 1.0), min(ex-1.0, 1.0), 0.5));
 
   // variable params
-  vec4 skin = 0.2 + 0.4 * pow(cos(4.*p+S), 2.0) * vec4(1.0, 0.7, 0.3, 1.0);
+  vec4 skin = 0.2 + 0.4 * pow(abs(cos(4.*p+S)), 2.0) * vec4(1.0, 0.7, 0.3, 1.0);
   vec4 hair = vec4(0.5, 0.3, 0.3, 1.0);
   vec4 sweater = vec4(
     0.3 * (1.0 + cos(3.*p + 6.*S)),
@@ -68,12 +68,12 @@ vec4 player (float p, float dx) {
   // left hand
   c += play * (hair + skin) * disc(pos2 - vec2(
     -0.2 + 0.01 * cos(5.0*pt),
-    0.45 - 0.1 * e.y * step(0.0, pt) * pow(sin(8.0 * pt * (1.0 + 0.2 * cos(pt))), 4.0)
+    0.45 - 0.1 * e.y * step(0.0, pt) * pow(abs(sin(8.0 * pt * (1.0 + 0.2 * cos(pt)))), 4.0)
   ), vec2(0.055, 0.05));
   // right hand
   c += play * (hair + skin) * disc(pos2 - vec2(
     0.2 + 0.01 * cos(5.0*pt),
-    0.45 - 0.1 * e.x * step(2.0, pt) * pow(cos(7.0 * pt), 4.0)
+    0.45 - 0.1 * e.x * step(2.0, pt) * pow(abs(cos(7.0 * pt)), 4.0)
   ), vec2(0.055, 0.05));
   // neck
   c += step(c.a, 0.0) * (hair + skin) *
