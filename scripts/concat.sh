@@ -7,6 +7,7 @@ else
   cat src/env_dev.js
 fi;
 
+cat src/utils.js
 cat src/path.js
 cat src/font.js
 cat src/webgl-utils.js
@@ -19,6 +20,6 @@ for glsl in *.vert *.frag; do
 done
 cd ..;
 
-cat src/index.js
+cat src/game.js
 
 cat src/post.js

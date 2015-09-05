@@ -1,4 +1,6 @@
 /* global
+smoothstep,
+normAngle,
 font,
 path,
 glCreateFBO,
@@ -273,14 +275,6 @@ function explodeAsteroid (j) {
   }
 }
 
-// Utils
-
-// normalize radian angle between -PI and PI (assuming it is not too far)
-function normAngle (a) {
-  return a < -Math.PI ? a + 2*Math.PI :
-  a>Math.PI ? a - 2*Math.PI : a;
-}
-
 // GAME LOGIC
 
 function euclidPhysics (obj) {
@@ -360,7 +354,8 @@ function applyIncLogic (o) {
 }
 
 // AI states
-function aiLogic () { // set the 3 AI inputs (rotate, shoot, boost)
+// q1 and q2 are 2 quality expertise of the player
+function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
   var x, y, ang;
   var prevRot = AIrotate;
   var prevBoost = AIboost;
@@ -397,7 +392,7 @@ function aiLogic () { // set the 3 AI inputs (rotate, shoot, boost)
     var curDist = dist(a, spaceship) - (10 + 10 * a[5]);
     var predDist = dist(aPred, predSpaceship) - (10 + 10 * a[5]);
     if (curDist - predDist > pred / 200 && // approaching
-      (curDist < 80 || predDist < 50)) {
+      (curDist < 80 || predDist < 30 + 30 * q2)) {
       // imminent collision
       if (!closestAsteroid || predDist < closestAsteroidPredDist) {
         closestAsteroid = a;
@@ -441,14 +436,14 @@ function aiLogic () { // set the 3 AI inputs (rotate, shoot, boost)
     (Math.random()<0.5 ? 0 : Math.random()<0.5 ? 1 : -1) :
     prevRot;
 
-  AIboost = (playingSince > 2000 && Math.random()<0.001*dt) ?
+  AIboost = (playingSince > 2000 && Math.random()<0.005*dt*(1-q1)) ?
     (Math.random()<0.5 ? 1 : -1) :
     prevBoost;
 
 
   // trying to avoid edges
 
-  if (distMiddle > 80) {
+  if (distMiddle > 100 - 80 * q2) {
     ang = normAngle(angMiddle-spaceship[4]);
     if (Math.abs(ang) > 2*Math.PI/3) {
       AIboost = -1;
@@ -465,24 +460,24 @@ function aiLogic () { // set the 3 AI inputs (rotate, shoot, boost)
   if (
     -Math.exp(-distMiddle/80) + // slow down if middle
     Math.exp(-vel) + // slow down if velocity
-    0//AIexcitement * Math.random() // excitement make it not slowing down
+    (1-q1) * AIexcitement * Math.random() // excitement make it not slowing down
     < Math.random()) {
     AIboost = opp(spaceship[2], spaceship[3]);
   }
 
-  if (closestAsteroid) {
+  if (closestAsteroid && q1>Math.random()-0.01*dt) {
     x = closestAsteroid[0]-spaceship[0];
     y = closestAsteroid[1]-spaceship[1];
     AIboost = opp(x, y);
   }
 
-  if (targetAsteroid) {
+  if (targetAsteroid && q2>Math.random()-0.01*dt) {
     x = targetAsteroid[0]-spaceship[0];
     y = targetAsteroid[1]-spaceship[1];
     ang = normAngle(Math.atan2(y, x)-spaceship[4]);
     var angabs = Math.abs(ang);
     if (Math.random() < 2*angabs) AIrotate = ang > 0 ? 1 : -1;
-    AIshoot = Math.random() < 0.01 * dt * Math.exp(-angabs*10);
+    AIshoot = Math.random() < 0.002 * dt * (Math.exp(-angabs*10) + AIexcitement + q1);
   }
 }
 
@@ -603,12 +598,22 @@ function update () {
   });
 
   // run spaceship AI
+  AIexcitement = 0;
   if (!dying && playingSince > 0) {
     var ax = Math.cos(spaceship[4]);
     var ay = Math.sin(spaceship[4]);
 
+    var quality =
+      1-Math.exp((1-player)/4) +
+      1-Math.exp((1-player)/8);
+    var rep = Math.random();
+    var mix = Math.exp((1-player)/16);
+    rep = rep * mix + 0.5 * (1-mix);
+    var q1 = Math.min(1, rep * quality);
+    var q2 = quality - q1;
+
     // ai logic (determine the 3 inputs)
-    aiLogic();
+    aiLogic(q1, q2);
 
     // apply ai inputs with game logic
 
@@ -942,37 +947,88 @@ function drawInc (o) {
   ctx.restore();
 }
 
+var lastStatement, lastStatementTime = 0;
+
 function drawUI () {
   var currentMessage = "",
     currentMessage2 = "",
-    currentMessageClr = "#f7c";
+    currentMessageClr = "#f7c",
+    currentMessageClr2 = "#7fc";
 
   if (!player) {
-    if (playingSince<-5000) {
-      currentMessage = "WELCOME TO THE REAL";
-      currentMessage2 = "ASTEROIDS !!!";
+    if (playingSince<-7000) {
+      currentMessage = "BEHIND ASTEROIDS";
+      currentMessage2 = "THE HIDDEN FACE";
     }
-    else if (-5000<playingSince && playingSince<-1000) {
+    else if (playingSince<-3500) {
+      currentMessageClr = currentMessageClr2 = "#7cf";
       currentMessage = "SEND ASTEROIDS TO MAKE";
       currentMessage2 = "PLAYERS WASTE THEIR MONEY";
     }
+    else {
+      var nb = Math.min(15, Math.floor((playingSince+3500)/100));
+      for (var i=0; i<nb; i++)
+        currentMessage += ".";
+      if (playingSince>-2000)
+        currentMessage2 = "A NEW PLAYER!";
+    }
+  }
+  else if (dying) {
+    if (lifes==1) {
+      currentMessage = "GOOD JOB !!!";
+      currentMessage2 = "THE DUDE IS BUMMED";
+    }
+    else if (lifes==2) {
+      currentMessage = "OK...";
+      currentMessage2 = "ONE MORE TIME !";
+    }
+    else {
+      if (lastStatement && t - lastStatementTime > 3000) { // lastStatementTime is not used here
+        currentMessage = lastStatement;
+      }
+      else {
+        currentMessage = ["!!!", "GREAT!", "COOL!", "OMG!", "AHAH!", "RUDE!", "EPIC!", "WICKED!", "SHAME!", "HEHEHE!", "BWAHAHA!"];
+        lastStatement = currentMessage = currentMessage[Math.floor(Math.random() * currentMessage.length)];
+        lastStatementTime = 0;
+      }
+    }
   }
   else {
-    if (playingSince<3000) {
-      currentMessage = "PLAYER "+player;
-    }
-    if (playingSince<-1000) {
+    if (playingSince<0) {
       currentMessage = "INCOMING NEW PLAYER...";
+      currentMessage2 = "ONE MORE 25¢ COIN! AHAH!";
     }
-    else if (playingSince<0) {
-      currentMessage = "ONE MORE 25¢ COIN!";
+    else if (playingSince<6000 && lifes==4) {
+      currentMessage = "PLAYER "+player;
+      currentMessage2 = [
+        "GENIOUS PLAYER!!",
+        "EXPERIENCED PLAYER!!",
+        "GOOD PLAYER. GET READY",
+        "NICE PLAYER.",
+        "BEGINNER.",
+        "VERY BEGINNER. EASY KILL"
+      ][Math.floor(Math.exp((-player)/8)*6)];
     }
-    if (dying && lifes===1) {
-      currentMessage = "GOOD JOB";
-    }
-    if (dying && lifes===2) {
-      currentMessage = "KILL IT";
-      currentMessage2 = "ONE MORE TIME !";
+    else {
+      currentMessageClr2 = "#f66";
+      if (lastStatement && t - lastStatementTime < 3000) {
+        currentMessage2 = lastStatement;
+      }
+      else {
+        lastStatement = null;
+        if (Math.random() < 0.0001 * dt && t - lastStatementTime > 8000) {
+          currentMessage2 = [
+            "COME ON! KILL IT!",
+            "JUST DO IT!",
+            "I WANT ¢¢¢",
+            "GIVE ME SOME ¢¢¢",
+            "DO IT!",
+            "DESTROY IT!"
+          ];
+          lastStatement = currentMessage2 = currentMessage2[Math.floor(Math.random() * currentMessage2.length)];
+          lastStatementTime = t;
+        }
+      }
     }
   }
 
@@ -986,11 +1042,12 @@ function drawUI () {
   ctx.save();
   ctx.translate(GAME_MARGIN, 20);
   ctx.lineWidth = (t%600>300) ? 2 : 1;
-  ctx.strokeStyle = currentMessageClr;
   ctx.save();
+  ctx.strokeStyle = currentMessageClr;
   font(currentMessage, 2, 1);
   ctx.restore();
   ctx.save();
+  ctx.strokeStyle = currentMessageClr2;
   ctx.translate(0, 30);
   font(currentMessage2, 2, 1);
   ctx.restore();
@@ -1193,6 +1250,7 @@ function render (_t) {
   gl.uniform1i(glUniformLocation(gameShader, "b"), glBindTexture(glGetFBOTexture(fbo2), 2));
   gl.uniform1i(glUniformLocation(gameShader, "l"), glBindTexture(glGetFBOTexture(glareFbo), 3));
   gl.uniform1i(glUniformLocation(gameShader, "e"), glBindTexture(glGetFBOTexture(playerFbo), 4));
+  gl.uniform1f(glUniformLocation(gameShader, "s"), !player ? smoothstep(-4000, -3000, playingSince) : 1);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
@@ -1200,13 +1258,17 @@ requestAnimationFrame(render);
 
 
 
-// DEBUG
+if (DEBUG) {
+  //playingSince=-1;
 
-playingSince=-1;
-setTimeout(function () {
-  setInterval(function () {
-    createInc();
-    if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
-    incomingObjects.splice(0, 1);
-  }, 1000);
-}, 5000);
+/*
+  setTimeout(function () {
+    setInterval(function () {
+      createInc();
+      if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
+      incomingObjects.splice(0, 1);
+    }, 100);
+  }, 5000);
+  */
+
+}
