@@ -1316,11 +1316,11 @@ function render (_t) {
   // Final draw
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   glBindShader(gameShader);
-  gl.uniform1i(glUniformLocation(gameShader, "g"), glBindTexture(glGetFBOTexture(laserFbo), 0));
-  gl.uniform1i(glUniformLocation(gameShader, "r"), glBindTexture(glGetFBOTexture(persistenceFbo), 1));
-  gl.uniform1i(glUniformLocation(gameShader, "b"), glBindTexture(glGetFBOTexture(fbo2), 2));
-  gl.uniform1i(glUniformLocation(gameShader, "l"), glBindTexture(glGetFBOTexture(glareFbo), 3));
-  gl.uniform1i(glUniformLocation(gameShader, "e"), glBindTexture(glGetFBOTexture(playerFbo), 4));
+  gl.uniform1i(glUniformLocation(gameShader, "G"), glBindTexture(glGetFBOTexture(laserFbo), 0));
+  gl.uniform1i(glUniformLocation(gameShader, "R"), glBindTexture(glGetFBOTexture(persistenceFbo), 1));
+  gl.uniform1i(glUniformLocation(gameShader, "B"), glBindTexture(glGetFBOTexture(fbo2), 2));
+  gl.uniform1i(glUniformLocation(gameShader, "L"), glBindTexture(glGetFBOTexture(glareFbo), 3));
+  gl.uniform1i(glUniformLocation(gameShader, "E"), glBindTexture(glGetFBOTexture(playerFbo), 4));
   gl.uniform1f(glUniformLocation(gameShader, "s"), !player ? smoothstep(-4000, -3000, playingSince) : 1);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
