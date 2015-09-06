@@ -195,6 +195,7 @@ function sendAsteroid (o) {
     var shape = o[5];
     asteroids.push([ x, y, rot, vel, shape, lvl ]);
     play(Asend);
+    return 1;
   }
   else {
     play(AsendFail);
@@ -625,9 +626,15 @@ function update () {
         if (keys[o[7]] || matchingTap) {
           // send an asteroid
           nevedPlayed = tap = keys[o[7]] = 0;
-          sendAsteroid(o);
-          incomingObjects.splice(i--, 1);
+          if (sendAsteroid(o))
+            incomingObjects.splice(i--, 1);
+          else
+              o[10] = t;
         }
+      }
+      else {
+        if (t-o[10] > 1000)
+          incomingObjects.splice(i--, 1);
       }
     }
     tap = 0;
@@ -773,34 +780,42 @@ function update () {
 
 
 function incPosition (o) {
-  var p = o[0] % borderLength;
+  var i = o[0] % borderLength;
   var x, y;
   var w = W + GAME_INC_PADDING;
   var h = H + GAME_INC_PADDING;
-  if (p<w) {
-    x = p;
+  if (i<w) {
+    x = i;
     y = 0;
   }
   else {
-    p -= w;
-    if (p < h) {
+    i -= w;
+    if (i < h) {
       x = w;
-      y = p;
+      y = i;
     }
     else {
-      p -= h;
-      if (p < w) {
-        x = w - p;
+      i -= h;
+      if (i < w) {
+        x = w - i;
         y = h;
       }
       else {
-        p -= w;
+        i -= w;
         x = 0;
-        y = h - p;
+        y = h - i;
       }
     }
   }
-  return [ -GAME_INC_PADDING/2 + x, -GAME_INC_PADDING/2 + y ];
+  var p = [ -GAME_INC_PADDING/2 + x, -GAME_INC_PADDING/2 + y ];
+  if (o[10]) {
+    var dt = t - o[10];
+    var a = Math.atan2(spaceship[1] - p[1], spaceship[0] - p[0]);
+    var l = dt * 0.3;
+    p[0] -= Math.cos(a) * l;
+    p[1] -= Math.sin(a) * l;
+  }
+  return p;
 }
 
 function incRotationCenter (o) {
@@ -994,7 +1009,7 @@ function drawInc (o) {
   var w = 10 * o[6];
   var valid = Math.abs(phase) < o[9];
 
-  if (playingSince>0 && lifes && !dying) {
+  if (playingSince>0 && lifes && !dying && !o[10]) {
     ctx.lineWidth = 1+o[3]/60;
     ctx.strokeStyle = valid ? "#7cf" : "#f66";
 
@@ -1047,7 +1062,7 @@ function drawInc (o) {
     ctx.restore();
   }
   else {
-    ctx.strokeStyle = "#999";
+    ctx.strokeStyle = o[10] ? "#f66" : "#999";
   }
 
   ctx.save();
@@ -1395,16 +1410,18 @@ requestAnimationFrame(render);
 if (DEBUG) {
   playingSince=-1;
   addEventListener("click", function () {
-    playingSince = 30000;
+    playingSince = -1;
     player += 1;
     incomingObjects = [];
     console.log("player=", player);
   });
 
+  /*
   setInterval(function () {
-    //createInc();
-    //if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
-    //incomingObjects.splice(0, 1);
-  }, 200);
+    createInc();
+    if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
+    incomingObjects.splice(0, 1);
+  }, 1000);
+  */
 
 }
