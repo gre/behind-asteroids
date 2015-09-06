@@ -53,7 +53,8 @@ var gl = c.getContext("webgl"),
   borderLength = 2*(W+H+2*GAME_INC_PADDING),
   SEED = Math.random(),
   excitementSmoothed = 0,
-  nevedPlayed = 1;
+  nevedPlayed = 1,
+  combos = 0;
 
 d.style.width = FW + "px";
 g.width = c.width = W;
@@ -91,7 +92,9 @@ var Aexplosion2 = audio([3,,0.38,0.5369,0.52,0.18,,-0.02,,,,-0.7444,0.78,,,0.761
 var Asend = audio([2,0.07,0.04,,0.24,0.25,,0.34,-0.1999,,,-0.02,,0.3187,,,-0.14,0.04,0.85,,0.28,0.63,,0.5]);
 var AsendFail = audio([1,,0.04,,0.45,0.14,0.06,-0.06,0.02,0.87,0.95,-0.02,,0.3187,,,-0.14,0.04,0.5,,,,,0.4]);
 
-var Alost = audio([0,0.11,0.37,,0.92,0.15,,-0.06,-0.04,0.29,0.14,0.1,,0.5047,,,,,0.16,-0.02,,,,0.3]);
+var Alost = audio([0,0.11,0.37,,0.92,0.15,,-0.06,-0.04,0.29,0.14,0.1,,0.5047,,,,,0.16,-0.02,,,,0.7]);
+var Acoin = audio([0,,0.0941,0.29,0.42,0.563,,,,,,0.4399,0.5658,,,,,,1,,,,,0.5]);
+var Amsg = audio([2,0.07,0.1,,0.2,0.75,0.35,-0.1,0.12,,,-0.02,,,,,-0.06,-0.0377,0.26,,,0.8,,0.7]);
 
 // set up WebGL layer
 
@@ -217,6 +220,7 @@ function randomAsteroids () {
   }
 }
 
+/*
 function randomInGameAsteroid () {
   var a = Math.random() < 0.5;
   var b = Math.random() < 0.5;
@@ -230,6 +234,7 @@ function randomInGameAsteroid () {
     lvl
   ]);
 }
+*/
 
 function maybeCreateInc () {
   var sum = incomingObjects.reduce(function (sum, o) {
@@ -573,19 +578,21 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
 
 var musicPhase = 0;
 var musicTick = 0;
-var musicFreq = 0.3;
 var musicPaused = 0;
 
 function update () {
   var i;
   var nbSpaceshipBullets = 0;
 
-  if (!dying && playingSince>0 && t-musicPaused>5000) {
-    musicFreq *= 1 + 0.00003*dt;
+  if (!dying && playingSince>0 && t-musicPaused>5000 && player > 1) {
 
-    if (musicFreq > 2) {
-      musicFreq = 0.3;
+    var combosTarget = (3 + player) * 3;
+    var musicFreq = 3*combos/combosTarget;
+    if (combos > combosTarget) {
       musicPaused = t;
+      combos = 0;
+      // CREATE A UFO
+      console.log("UFO!!!");
     }
 
     musicPhase += musicFreq*2*Math.PI*dt/1000;
@@ -596,8 +603,10 @@ function update () {
   }
 
   // randomly send some asteroids
+  /*
   if (Math.random() < 0.001 * dt)
     randomInGameAsteroid();
+  */
 
   // player lifecycle
 
@@ -611,13 +620,12 @@ function update () {
     score = 0;
     scoreForLife = 0;
     asteroids = [];
-    musicFreq = 0.3;
-    musicPaused = t;
+    play(Acoin);
   }
 
   // inc lifecycle
 
-  if (playingSince > 1000 && lifes) {
+  if (playingSince > 1000 && !dying) {
     for (i = 0; i < incomingObjects.length; i++) {
       var o = incomingObjects[i];
       if (!o[10]) {
@@ -626,10 +634,14 @@ function update () {
         if (keys[o[7]] || matchingTap) {
           // send an asteroid
           nevedPlayed = tap = keys[o[7]] = 0;
-          if (sendAsteroid(o))
+          if (sendAsteroid(o)) {
+            if (player > 1) combos ++;
             incomingObjects.splice(i--, 1);
-          else
-              o[10] = t;
+          }
+          else {
+            combos = 0;
+            o[10] = t;
+          }
         }
       }
       else {
@@ -1088,6 +1100,8 @@ function drawInc (o) {
 
 var lastStatement, lastStatementTime = 0;
 
+var lastMessage2;
+
 function drawUI () {
   var currentMessage = "",
     currentMessage2 = "",
@@ -1114,10 +1128,12 @@ function drawUI () {
   }
   else if (dying) {
     if (lifes==1) {
+      currentMessageClr2 = "#f66";
       currentMessage = "GOOD JOB !!!";
-      currentMessage2 = "THE DUDE IS BUMMED";
+      currentMessage2 = "THE DUDE IS TIRED";
     }
     else if (lifes==2) {
+      currentMessageClr2 = "#f66";
       currentMessage = "OK...";
       currentMessage2 = "ONE MORE TIME !";
     }
@@ -1135,7 +1151,7 @@ function drawUI () {
   else {
     if (playingSince<0) {
       currentMessage = "INCOMING NEW PLAYER...";
-      currentMessage2 = "ONE MORE 25¢ COIN! AHAH!";
+      currentMessage2 = "25¢ 25¢ 25¢ 25¢ 25¢";
     }
     else if (playingSince<6000 && lifes==4) {
       currentMessage = "PLAYER "+player;
@@ -1156,9 +1172,20 @@ function drawUI () {
       else {
         if (nevedPlayed) {
           if (playingSince>10000) {
+            currentMessageClr = currentMessageClr2 = "#7cf";
             currentMessage = MOBILE ? "TAP ON ASTEROIDS" : "PRESS ASTEROIDS LETTER";
             currentMessage2 = "TO SEND THEM TO THE GAME";
           }
+        }
+        else if (player===2 && 5000<playingSince && playingSince<15000) {
+          currentMessageClr = currentMessageClr2 = "#f66";
+          currentMessage = "AHAH! NOW LETS SEND...";
+          currentMessage2 = "...SOME UFOS !!!";
+        }
+        else if (player===3 && 5000<playingSince && playingSince<15000) {
+          currentMessageClr = currentMessageClr2 = "#7cf";
+          currentMessage = "CAREFUL ABOUT";
+          currentMessage2 = "RED ZONE";
         }
         else {
           lastStatement = 0;
@@ -1179,6 +1206,10 @@ function drawUI () {
     }
   }
 
+  if (currentMessage2 && lastMessage2 !== currentMessage2 && currentMessageClr2 === "#f66") {
+    play(Amsg);
+  }
+
   ctx.save();
   ctx.translate(FW - GAME_MARGIN, 2);
   ctx.lineWidth = 2;
@@ -1196,8 +1227,15 @@ function drawUI () {
   ctx.save();
   ctx.strokeStyle = currentMessageClr2;
   ctx.translate(0, MOBILE ? 30 : 40);
-  font(currentMessage2, MOBILE ? 1.5 : 2, 1);
+  font(lastMessage2 = currentMessage2, MOBILE ? 1.5 : 2, 1);
   ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = "#7cf";
+  ctx.translate(FW - GAME_MARGIN, FH - 20);
+  if (combos) font(combos+"x", 1.5, -1);
+  ctx.restore();
+
   ctx.restore();
 }
 
@@ -1408,13 +1446,15 @@ requestAnimationFrame(render);
 
 
 if (DEBUG) {
+  /*
   playingSince=-1;
-  addEventListener("click", function () {
+  addEventListener("dblclick", function () {
     playingSince = -1;
     player += 1;
     incomingObjects = [];
     console.log("player=", player);
   });
+  */
 
   /*
   setInterval(function () {
