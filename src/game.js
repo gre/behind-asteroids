@@ -34,7 +34,8 @@ play
 
 /* TODO list
 - Polish the AI
-- audio
+- gfx
+  - small fuel booster
 - game features (if time)
   - UFO "bonus"
 */
@@ -53,7 +54,8 @@ var gl = c.getContext("webgl"),
   borderLength = 2*(W+H+2*GAME_INC_PADDING),
   SEED = Math.random(),
   excitementSmoothed = 0,
-  nevedPlayed = 1,
+  neverPlayed = 1,
+  neverUFOs = 1,
   combos = 0;
 
 d.style.width = FW + "px";
@@ -141,7 +143,7 @@ var t = 0, dt,
 
   spaceship = [ W/2, H/2, 0, 0, 0 ], // [x, y, velx, vely, rot]
   asteroids = [], // array of [x, y, rot, vel, shape, lvl]
-//  aliens = []; // array of [x, y, rot, vel]
+  ufos = [], // array of [x, y, vx, vy]
   bullets = [], // array of [x, y, velx, vely, life, isAlien]
   incomingObjects = [], // array of: [pos, vel, ang, force, rotVel, shape, lvl, key, rotAmp, rotAmpValid, explodeTime]
   particles = [], // array of [x, y, rot, vel, life]
@@ -185,7 +187,6 @@ else {
 }
 
 // game actions
-
 
 function sendAsteroid (o) {
   if (Math.abs(Math.cos(o[2])) < o[9]) {
@@ -287,7 +288,6 @@ function createInc () {
   var pRotSpeed = diffMin + Math.random() * (diffMax-diffMin);
 
   var ampRot = Math.PI * (0.5 * Math.random() + 0.5 * Math.random() * pRotAmp) * pRotAmp;
-
   var lvl = Math.floor(2 + 3 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
 
   incomingObjects.push([
@@ -333,9 +333,9 @@ function randomAsteroidShape (lvl) {
 
 function explose (o) {
   play(Math.random()<0.5 ? Aexplosion1 : Aexplosion2);
-  var n = Math.floor(9 + 9 * Math.random());
+  var n = Math.floor(19 + 9 * Math.random());
   for (var i = 0; i < n; ++i) {
-    var l = 20 * Math.random();
+    var l = 30 * Math.random() - 10;
     var a = (Math.random() + 2 * Math.PI * i) / n;
     particles.push([
       o[0] + l * Math.cos(a),
@@ -586,13 +586,18 @@ function update () {
 
   if (!dying && playingSince>0 && t-musicPaused>5000 && player > 1) {
 
-    var combosTarget = (3 + player) * 3;
+    var combosTarget = 2 * player;
     var musicFreq = 3*combos/combosTarget;
     if (combos > combosTarget) {
       musicPaused = t;
-      combos = 0;
-      // CREATE A UFO
-      console.log("UFO!!!");
+      neverUFOs = combos = 0;
+      var a = 2 * Math.PI * Math.random();
+      ufos.push([
+        W * Math.random(),
+        H * Math.random(),
+        0.1 * Math.cos(a),
+        0.1 * Math.sin(a)
+      ]);
     }
 
     musicPhase += musicFreq*2*Math.PI*dt/1000;
@@ -620,6 +625,7 @@ function update () {
     score = 0;
     scoreForLife = 0;
     asteroids = [];
+    ufos = [];
     play(Acoin);
   }
 
@@ -633,7 +639,7 @@ function update () {
         var matchingTap = tap && circleCollides(tap, p, 40 + 10 * o[6]);
         if (keys[o[7]] || matchingTap) {
           // send an asteroid
-          nevedPlayed = tap = keys[o[7]] = 0;
+          neverPlayed = tap = keys[o[7]] = 0;
           if (sendAsteroid(o)) {
             if (player > 1) combos ++;
             incomingObjects.splice(i--, 1);
@@ -666,6 +672,7 @@ function update () {
       // Player lost. game over
       playingSince = -5000;
       randomAsteroids();
+      ufos = [];
       play(Alost);
     }
   }
@@ -757,7 +764,7 @@ function update () {
     spaceship[2] += AIboost * dt * 0.0002 * ax;
     spaceship[3] += AIboost * dt * 0.0002 * ay;
     spaceship[4] = normAngle(spaceship[4] + AIrotate * dt * 0.005);
-    if (nbSpaceshipBullets < 4) {
+    if (nbSpaceshipBullets < 3) {
       if (AIshoot) {
         play(Ashot);
         bullets.push([
@@ -774,7 +781,7 @@ function update () {
 
   euclidPhysics(spaceship);
   asteroids.forEach(polarPhysics);
-  //aliens.forEach(polarPhysics);
+  ufos.forEach(euclidPhysics);
   bullets.forEach(euclidPhysics);
   particles.forEach(polarPhysics);
 
@@ -783,7 +790,7 @@ function update () {
   particles.forEach(applyLife);
   loopOutOfBox(spaceship);
   asteroids.forEach(playingSince > 0 ? destroyOutOfBox : loopOutOfBox);
-  //aliens.forEach(loopOutOfBox);
+  ufos.forEach(loopOutOfBox);
   bullets.forEach(applyLife);
   bullets.forEach(loopOutOfBox);
 
@@ -902,6 +909,43 @@ function drawAsteroid (o) {
   ctx.globalAlpha = 0.2;
   ctx.strokeStyle = "#f00";
   path(o[4]);
+  ctx.stroke();
+}
+
+function drawUFO (o) {
+  ctx.globalAlpha = 0.4;
+  ctx.strokeStyle = "#f00";
+  var a = [
+    [8,0],
+    [7,5],
+    [0,9],
+    [7,14]
+  ];
+  var b = [
+    [15,14],
+    [22,9],
+    [15,5],
+    [14,0]
+  ];
+  path(
+    a
+    .concat(b)
+    .concat(a)
+    .concat([,])
+    .concat(b)
+    .concat([
+      ,
+      [7,5],
+      [15,5],
+      ,
+      [0,9],
+      [22,9]
+    ]));
+  ctx.stroke();
+
+  ctx.translate(11, 20);
+  ctx.globalAlpha = 0.2;
+  font("NOT IMPLEMENTED!", 0.5);
   ctx.stroke();
 }
 
@@ -1170,22 +1214,23 @@ function drawUI () {
         currentMessage2 = lastStatement;
       }
       else {
-        if (nevedPlayed) {
+        if (neverPlayed) {
           if (playingSince>10000) {
             currentMessageClr = currentMessageClr2 = "#7cf";
             currentMessage = MOBILE ? "TAP ON ASTEROIDS" : "PRESS ASTEROIDS LETTER";
             currentMessage2 = "TO SEND THEM TO THE GAME";
           }
         }
-        else if (player===2 && 5000<playingSince && playingSince<15000) {
+        else if (player===2 && 5000<playingSince && neverUFOs) {
           currentMessageClr = currentMessageClr2 = "#f66";
           currentMessage = "AHAH! NOW LETS SEND...";
           currentMessage2 = "...SOME UFOS !!!";
         }
         else if (player===3 && 5000<playingSince && playingSince<15000) {
-          currentMessageClr = currentMessageClr2 = "#7cf";
-          currentMessage = "CAREFUL ABOUT";
-          currentMessage2 = "RED ZONE";
+          currentMessageClr = "#7cf";
+          currentMessageClr2 = "#f66";
+          currentMessage = "CAREFUL ABOUT THE";
+          currentMessage2 = "RED";
         }
         else {
           lastStatement = 0;
@@ -1315,7 +1360,7 @@ function render (_t) {
   ctx.restore();
 
   renderCollection(asteroids, drawAsteroid);
-  //renderCollection(aliens, drawAlien);
+  renderCollection(ufos, drawUFO);
   renderCollection(bullets, drawBullet);
   renderCollection(particles, drawParticle);
 
@@ -1463,5 +1508,14 @@ if (DEBUG) {
     incomingObjects.splice(0, 1);
   }, 1000);
   */
+
+  for (var j = 0; j < 9; j++) {
+    ufos.push([
+      Math.random()*W,
+      Math.random()*H,
+      0.1*Math.random(),
+      0.1*Math.random()
+    ]);
+  }
 
 }
