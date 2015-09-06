@@ -52,7 +52,8 @@ var gl = c.getContext("webgl"),
   H = FH - GAME_MARGIN - GAME_TOP_MARGIN,
   borderLength = 2*(W+H+2*GAME_INC_PADDING),
   SEED = Math.random(),
-  excitementSmoothed = 0;
+  excitementSmoothed = 0,
+  nevedPlayed = 1;
 
 d.style.width = FW + "px";
 g.width = c.width = W;
@@ -623,8 +624,7 @@ function update () {
         var matchingTap = tap && circleCollides(tap, p, 40 + 10 * o[6]);
         if (keys[o[7]] || matchingTap) {
           // send an asteroid
-          keys[o[7]] = 0;
-          tap = 0;
+          nevedPlayed = tap = keys[o[7]] = 0;
           sendAsteroid(o);
           incomingObjects.splice(i--, 1);
         }
@@ -1139,18 +1139,26 @@ function drawUI () {
         currentMessage2 = lastStatement;
       }
       else {
-        lastStatement = 0;
-        if (Math.random() < 0.0001 * dt && t - lastStatementTime > 8000) {
-          currentMessage2 = [
-            "COME ON! KILL IT!",
-            "JUST DO IT!",
-            "I WANT ¢¢¢",
-            "GIVE ME SOME ¢¢¢",
-            "DO IT!",
-            "DESTROY IT!"
-          ];
-          lastStatement = currentMessage2 = currentMessage2[Math.floor(Math.random() * currentMessage2.length)];
-          lastStatementTime = t;
+        if (nevedPlayed) {
+          if (playingSince>10000) {
+            currentMessage = MOBILE ? "TAP ON ASTEROIDS" : "PRESS ASTEROIDS LETTER";
+            currentMessage2 = "TO SEND THEM TO THE GAME";
+          }
+        }
+        else {
+          lastStatement = 0;
+          if (Math.random() < 0.0001 * dt && t - lastStatementTime > 8000) {
+            currentMessage2 = [
+              "COME ON! KILL IT!",
+              "JUST DO IT!",
+              "I WANT ¢¢¢",
+              "GIVE ME SOME ¢¢¢",
+              "DO IT!",
+              "DESTROY IT!"
+            ];
+            lastStatement = currentMessage2 = currentMessage2[Math.floor(Math.random() * currentMessage2.length)];
+            lastStatementTime = t;
+          }
         }
       }
     }
