@@ -97,6 +97,8 @@ var AsendFail = audio([1,,0.04,,0.45,0.14,0.06,-0.06,0.02,0.87,0.95,-0.02,,0.318
 var Alost = audio([0,0.11,0.37,,0.92,0.15,,-0.06,-0.04,0.29,0.14,0.1,,0.5047,,,,,0.16,-0.02,,,,0.7]);
 var Acoin = audio([0,,0.0941,0.29,0.42,0.563,,,,,,0.4399,0.5658,,,,,,1,,,,,0.5]);
 var Amsg = audio([2,0.07,0.1,,0.2,0.75,0.35,-0.1,0.12,,,-0.02,,,,,-0.06,-0.0377,0.26,,,0.8,,0.7]);
+var Aufo = audio([2,0.5,0.5,,1,0.5,,,,0.46,0.29,,,,,,,,1,,,,,0.5]);
+
 
 // set up WebGL layer
 
@@ -912,7 +914,7 @@ function drawAsteroid (o) {
   ctx.stroke();
 }
 
-function drawUFO (o) {
+function drawUFO () {
   ctx.globalAlpha = 0.4;
   ctx.strokeStyle = "#f00";
   var a = [
@@ -1054,6 +1056,29 @@ function drawGlitch () {
   ctx.arc(0, 0, 12, 1, 2);
   ctx.stroke();
   ctx.restore();
+}
+
+function draw () {
+  ctx.save();
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+
+  renderCollection(asteroids, drawAsteroid);
+  renderCollection(ufos, drawUFO);
+  renderCollection(bullets, drawBullet);
+  renderCollection(particles, drawParticle);
+
+  if (playingSince > 0) {
+    ctx.save();
+    translateTo(spaceship);
+    drawSpaceship(spaceship);
+    ctx.restore();
+  }
+
+  drawGameUI();
+
+  drawGlitch();
 }
 
 //// UI
@@ -1354,26 +1379,7 @@ function render (_t) {
 
   ctx.save();
 
-  ctx.save();
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, W, H);
-  ctx.restore();
-
-  renderCollection(asteroids, drawAsteroid);
-  renderCollection(ufos, drawUFO);
-  renderCollection(bullets, drawBullet);
-  renderCollection(particles, drawParticle);
-
-  if (playingSince > 0) {
-    ctx.save();
-    translateTo(spaceship);
-    drawSpaceship(spaceship);
-    ctx.restore();
-  }
-
-  drawGameUI();
-
-  drawGlitch();
+  draw();
 
   ctx.restore();
 
@@ -1488,8 +1494,6 @@ function render (_t) {
 
 requestAnimationFrame(render);
 
-
-
 if (DEBUG) {
   /*
   playingSince=-1;
@@ -1508,14 +1512,5 @@ if (DEBUG) {
     incomingObjects.splice(0, 1);
   }, 1000);
   */
-
-  for (var j = 0; j < 9; j++) {
-    ufos.push([
-      Math.random()*W,
-      Math.random()*H,
-      0.1*Math.random(),
-      0.1*Math.random()
-    ]);
-  }
 
 }
