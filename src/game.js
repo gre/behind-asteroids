@@ -87,7 +87,9 @@ var Amusic2 = audio([,,0.12,,0.13,0.165,,,,,,,,,,,,,0.7,,,,,0.5]);
 var Aexplosion1 = audio([3,,0.35,0.5369,0.5,0.15,,-0.02,,,,-0.7444,0.78,,,0.7619,,,0.1,,,,,0.5]);
 var Aexplosion2 = audio([3,,0.38,0.5369,0.52,0.18,,-0.02,,,,-0.7444,0.78,,,0.7619,,,0.1,,,,,0.5]);
 
-var Asend = audio([2,0.07,0.04,,0.24,0.25,,0.34,-0.1999,,,-0.02,,0.3187,,,-0.14,0.04,0.85,,0.28,0.63,,0.4]);
+var Asend = audio([2,0.07,0.04,,0.24,0.25,,0.34,-0.1999,,,-0.02,,0.3187,,,-0.14,0.04,0.85,,0.28,0.63,,0.5]);
+var AsendFail = audio([1,,0.04,,0.45,0.14,0.06,-0.06,0.02,0.87,0.95,-0.02,,0.3187,,,-0.14,0.04,0.5,,,,,0.4]);
+
 var Alost = audio([0,0.11,0.37,,0.92,0.15,,-0.06,-0.04,0.29,0.14,0.1,,0.5047,,,,,0.16,-0.02,,,,0.3]);
 
 // set up WebGL layer
@@ -137,7 +139,7 @@ var t = 0, dt,
   asteroids = [], // array of [x, y, rot, vel, shape, lvl]
 //  aliens = []; // array of [x, y, rot, vel]
   bullets = [], // array of [x, y, velx, vely, life, isAlien]
-  incomingObjects = [], // array of: [pos, vel, ang, force, rotVel, shape, lvl, key, rotAmp]
+  incomingObjects = [], // array of: [pos, vel, ang, force, rotVel, shape, lvl, key, rotAmp, rotAmpValid, explodeTime]
   particles = [], // array of [x, y, rot, vel, life]
 
   dying = 0,
@@ -182,15 +184,20 @@ else {
 
 
 function sendAsteroid (o) {
-  var p = incPosition(o);
-  var rot = incRotation(o);
-  var x = Math.max(0, Math.min(p[0], W));
-  var y = Math.max(0, Math.min(p[1], H));
-  var vel = 0.005 * o[3] * (0.5 + 0.5 * Math.random());
-  var lvl = o[6];
-  var shape = o[5];
-  asteroids.push([ x, y, rot, vel, shape, lvl ]);
-  play(Asend);
+  if (Math.abs(Math.cos(o[2])) < o[9]) {
+    var p = incPosition(o);
+    var rot = incRotation(o);
+    var x = Math.max(0, Math.min(p[0], W));
+    var y = Math.max(0, Math.min(p[1], H));
+    var vel = 0.005 * o[3] * (0.5 + 0.5 * Math.random());
+    var lvl = o[6];
+    var shape = o[5];
+    asteroids.push([ x, y, rot, vel, shape, lvl ]);
+    play(Asend);
+  }
+  else {
+    play(AsendFail);
+  }
 }
 
 function randomAsteroids () {
@@ -226,9 +233,17 @@ function maybeCreateInc () {
   var sum = incomingObjects.reduce(function (sum, o) {
     return o[6];
   }, 0);
-  if (Math.random() < 0.03 * dt *
-    Math.exp(-sum*2) *
-    (1 + player / 3 - Math.exp(-playingSince / 60000))
+  // create inc is ruled with probabilities
+  if (Math.random() <
+    0.01 * dt * // continous time probability
+    Math.exp(-sum * // more there is object, more it is rare to create new ones
+    (1 + Math.exp(-(player-1)/2)) // first rounds have less items
+    ) *
+    (1 - Math.exp(-playingSince / 15000)) * // 0% to 50% in 0 to 10 sec of beginning
+    (
+      0.5 +
+      0.5 * Math.exp(-Math.max(0, (player-10)/10)) // items decrease after round 10
+    )
   )
     return createInc();
 }
@@ -249,16 +264,48 @@ function createInc () {
   }
   if (!availableKeys.length) return 0;
 
-  var vel = 0.1; // FIXME remove
-  var ang = 2*Math.PI*Math.random();
-  var force = 30*Math.random();
-  var lvl = Math.floor(2 + 3 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
-  var rotVel = 0.002 * (1 - 0.5 * Math.exp((1-player)/3) + lvl * Math.random() * Math.random());
-  var shape = randomAsteroidShape(lvl);
-  var key = availableKeys[Math.floor(Math.random() * availableKeys.length)];
-  var rotAmp = (1-Math.exp(-player/3)) * (Math.PI/3) * (1-Math.random()*Math.exp(-0.3*(lvl-2)));
+  /*
+  PARAMS to vary with game difficulty
+  - higher rotation amplitude
+  - lower rotation valid amp ratio
+  - higher rotation speed
+  */
 
-  incomingObjects.push([ pos, vel, ang, force, rotVel, shape, lvl, key, rotAmp ]);
+  var diffMax = 1-Math.exp(-player/5);
+  var diffMin = 1-Math.exp((1-player)/20);
+  if (Math.random() > diffMax) diffMin *= Math.random();
+
+  var pRotAmp = diffMin + Math.random() * (diffMax-diffMin);
+  var pRotAmpRatio = diffMin + Math.random() * (diffMax-diffMin);
+  var pRotSpeed = diffMin + Math.random() * (diffMax-diffMin);
+
+  var ampRot = Math.PI * (0.5 * Math.random() + 0.5 * Math.random() * pRotAmp) * pRotAmp;
+
+  var lvl = Math.floor(2 + 3 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
+
+  incomingObjects.push([
+    pos,
+    // velocity
+    0.1,
+    // initial angle
+    2*Math.PI*Math.random(),
+    // initial force
+    30*Math.random(),
+    // rot velocity
+    0.002 + 0.001 * (Math.random() + 0.5 * lvl * Math.random()) * pRotSpeed - 0.001 * pRotAmp,
+    // shape
+    randomAsteroidShape(lvl),
+    // level
+    lvl,
+    // key
+    availableKeys[Math.floor(Math.random() * availableKeys.length)],
+    // amplitude rotation
+    ampRot,
+    // amplitude rotation valid ratio
+    ampRot > 0.8-pRotAmpRatio ? 1 - 0.6 * pRotAmpRatio - 0.2 * pRotAmp : 1,
+    // explode time
+    0
+  ]);
   return 1;
 }
 
@@ -386,9 +433,11 @@ function resetSpaceship () {
 */
 
 function applyIncLogic (o) {
-  o[0] += 0.1 * dt;
-  o[2] += o[4] * dt;
-  o[3] = o[3] < 10 ? 60 : o[3] * (1 - 0.0008 * dt);
+  if (!o[10]) {
+    o[0] += 0.1 * dt;
+    o[2] += o[4] * dt;
+    o[3] = o[3] < 10 ? 60 : o[3] * (1 - 0.0008 * dt);
+  }
 }
 
 // AI states
@@ -423,20 +472,21 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
 
   for (i = 0; i < asteroids.length; ++i) {
     var a = asteroids[i];
-    if (a[0]<0 || a[1]<0 || a[0]>W || a[1]>H) continue;
-    var aPred = [].concat(a);
-    aPred[0] += Math.cos(a[2]) * a[3] * pred;
-    aPred[1] += Math.sin(a[2]) * a[3] * pred;
-    var curDist = dist(a, spaceship) - (10 + 10 * a[5]);
-    var predDist = dist(aPred, predSpaceship) - (10 + 10 * a[5]);
-    if (curDist - predDist > pred / 200 && // approaching
-      (curDist < 80 || predDist < 30 + 30 * q2)) {
-      // imminent collision
-      if (!closestAsteroid || predDist < closestAsteroidPredDist) {
-        closestAsteroid = a;
-        targetAsteroid = a;
-        closestAsteroidPredDist = predDist;
-        danger ++;
+    if (!(a[0]<0 || a[1]<0 || a[0]>W || a[1]>H)) {
+      var aPred = [].concat(a);
+      aPred[0] += Math.cos(a[2]) * a[3] * pred;
+      aPred[1] += Math.sin(a[2]) * a[3] * pred;
+      var curDist = dist(a, spaceship) - (10 + 10 * a[5]);
+      var predDist = dist(aPred, predSpaceship) - (10 + 10 * a[5]);
+      if (curDist - predDist > pred / 200 && // approaching
+        (curDist < 80 || predDist < 30 + 30 * q2)) {
+        // imminent collision
+        if (!closestAsteroid || predDist < closestAsteroidPredDist) {
+          closestAsteroid = a;
+          targetAsteroid = a;
+          closestAsteroidPredDist = predDist;
+          danger ++;
+        }
       }
     }
 
@@ -503,7 +553,7 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
     AIboost = opp(spaceship[2], spaceship[3]);
   }
 
-  if (closestAsteroid && q1>Math.random()-0.01*dt) {
+  if (closestAsteroid && q1>Math.random()-0.02*dt) {
     x = closestAsteroid[0]-spaceship[0];
     y = closestAsteroid[1]-spaceship[1];
     AIboost = opp(x, y);
@@ -514,8 +564,8 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
     y = targetAsteroid[1]-spaceship[1];
     ang = normAngle(Math.atan2(y, x)-spaceship[4]);
     var angabs = Math.abs(ang);
-    if (Math.random() < 2*angabs) AIrotate = ang > 0 ? 1 : -1;
-    AIshoot = Math.random() < 0.002 * dt * (Math.exp(-angabs*10) + AIexcitement + q1);
+    if (Math.random() < 0.06*dt*angabs) AIrotate = ang > 0 ? 1 : -1;
+    AIshoot = Math.random() < 0.003 * dt * (Math.exp(-angabs*10) + AIexcitement + q1);
   }
 }
 
@@ -565,19 +615,20 @@ function update () {
 
   // inc lifecycle
 
-  if (playingSince > 1000) {
-    for (i = 0; i < incomingObjects.length;) {
+  if (playingSince > 1000 && lifes) {
+    for (i = 0; i < incomingObjects.length; i++) {
       var o = incomingObjects[i];
-      var p = incPosition(o);
-      var matchingTap = tap && circleCollides(tap, p, 40 + 10 * o[6]);
-      if (keys[o[7]] || matchingTap) {
-        // send an asteroid
-        keys[o[7]] = 0;
-        tap = 0;
-        sendAsteroid(o);
-        incomingObjects.splice(i, 1);
+      if (!o[10]) {
+        var p = incPosition(o);
+        var matchingTap = tap && circleCollides(tap, p, 40 + 10 * o[6]);
+        if (keys[o[7]] || matchingTap) {
+          // send an asteroid
+          keys[o[7]] = 0;
+          tap = 0;
+          sendAsteroid(o);
+          incomingObjects.splice(i--, 1);
+        }
       }
-      else i++;
     }
     tap = 0;
 
@@ -854,13 +905,13 @@ function drawGameUI () {
   ctx.restore();
 
   ctx.save();
-  ctx.translate(30, 20);
+  ctx.translate(50, 20);
   font(scoreTxt(score), 1.5, 1);
   ctx.restore();
 
   if (playingSince < 0) {
     ctx.save();
-    ctx.translate(W-30, 20);
+    ctx.translate(W-50, 20);
     font(scoreTxt(0), 1.5, -1);
     ctx.restore();
 
@@ -886,7 +937,7 @@ function drawGameUI () {
   else {
     for (var i=1; i<lifes; i++) {
       ctx.save();
-      ctx.translate(40 + i * 10, 50);
+      ctx.translate(60 + i * 10, 50);
       ctx.rotate(-Math.PI/2);
       path([
         [-4, -4],
@@ -938,61 +989,66 @@ function drawGlitch () {
 
 function drawInc (o) {
   var rotC = incRotationCenter(o);
-  var rot = Math.cos(o[2]) * o[8] + rotC;
+  var phase = Math.cos(o[2]);
+  var rot = phase * o[8] + rotC;
   var w = 10 * o[6];
+  var valid = Math.abs(phase) < o[9];
 
-  ctx.lineWidth = 1+o[3]/60;
-  ctx.strokeStyle = "#7cf";
+  if (playingSince>0 && lifes && !dying) {
+    ctx.lineWidth = 1+o[3]/60;
+    ctx.strokeStyle = valid ? "#7cf" : "#f66";
 
-  ctx.save();
-  /*
-  ctx.fillStyle =
-  ctx.strokeStyle = "#469";
-  */
-  ctx.strokeStyle = "#469";
-  ctx.lineWidth = 1;
-  ctx.rotate(rotC);
-  ctx.beginPath();
-  ctx.arc(0, 0, w+10, -o[8], o[8]);
-  ctx.stroke();
-  /*
-  ctx.beginPath();
-  ctx.arc(w+10, 0, 1, 0, 2*Math.PI);
-  ctx.fill();
-  */
-  ctx.strokeStyle = "#7cf";
-  path([
-    [w+8, 0],
-    [w+12, 0]
-  ]);
-  ctx.stroke();
-  ctx.restore();
+    if (o[8] > 0.1) {
+      ctx.save();
+      ctx.rotate(rotC);
+      ctx.strokeStyle = "#f66";
+      ctx.beginPath();
+      ctx.arc(0, 0, w+10, -o[8], -o[8]*o[9]);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, w+10, o[8]*o[9], o[8]);
+      ctx.stroke();
+      ctx.strokeStyle = "#7cf";
+      ctx.beginPath();
+      ctx.arc(0, 0, w+10, -o[8] * o[9], o[8] * o[9]);
+      ctx.stroke();
+      path([
+        [w+8, 0],
+        [w+12, 0]
+      ]);
+      ctx.stroke();
+      ctx.restore();
+    }
 
-  ctx.save();
-  //ctx.globalAlpha = 0.4 + 0.6 * o[3] / 60;
-  ctx.rotate(rot);
-  var mx = 60 + w;
-  var x = o[3] + w;
-  ctx.strokeStyle = "#469";
-  path([
-    [0,0],
-    [mx,0]
-  ]);
-  ctx.stroke();
-  ctx.strokeStyle = "#7cf";
-  path([
-    [0,0],
-    [x,0]
-  ]);
-  ctx.stroke();
-  var r = 6;
-  path([
-    [ mx - r, r ],
-    [ mx, 0],
-    [ mx - r, -r ]
-  ], 1);
-  ctx.stroke();
-  ctx.restore();
+    ctx.save();
+    ctx.rotate(rot);
+    ctx.save();
+    var mx = 60 + w;
+    var x = o[3] + w;
+    ctx.globalAlpha = 0.2;
+    path([
+      [0,0],
+      [mx,0]
+    ]);
+    ctx.stroke();
+    ctx.restore();
+    path([
+      [0,0],
+      [x,0]
+    ]);
+    ctx.stroke();
+    var r = 6;
+    path([
+      [ mx - r, r ],
+      [ mx, 0],
+      [ mx - r, -r ]
+    ], 1);
+    ctx.stroke();
+    ctx.restore();
+  }
+  else {
+    ctx.strokeStyle = "#999";
+  }
 
   ctx.save();
   path(o[5]);
@@ -1007,9 +1063,8 @@ function drawInc (o) {
     sum[1] += p[1];
   });
 
-  if (!MOBILE) {
+  if (!MOBILE && playingSince>0) {
     ctx.save();
-    ctx.lineStyle = "#7cf";
     ctx.translate(sum[0]/o[5].length+1, sum[1]/o[5].length-5);
     font(String.fromCharCode(o[7]), 1);
     ctx.restore();
@@ -1176,7 +1231,7 @@ function render (_t) {
 
   ctx.translate(GAME_MARGIN, GAME_TOP_MARGIN);
 
-  if (playingSince>0) incomingObjects.forEach(function (inc) {
+  incomingObjects.forEach(function (inc) {
     ctx.save();
     translateTo(incPosition(inc));
     drawInc(inc);
@@ -1331,14 +1386,17 @@ requestAnimationFrame(render);
 
 if (DEBUG) {
   playingSince=-1;
-/*
-  setTimeout(function () {
-    setInterval(function () {
-      createInc();
-      if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
-      incomingObjects.splice(0, 1);
-    }, 100);
-  }, 5000);
-  */
+  addEventListener("click", function () {
+    playingSince = 30000;
+    player += 1;
+    incomingObjects = [];
+    console.log("player=", player);
+  });
+
+  setInterval(function () {
+    //createInc();
+    //if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
+    //incomingObjects.splice(0, 1);
+  }, 200);
 
 }
