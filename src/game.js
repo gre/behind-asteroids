@@ -254,7 +254,7 @@ function maybeCreateInc () {
     return o[6];
   }, 0);
   // create inc is ruled with probabilities
-  if (Math.random() < 0.1+
+  if (Math.random() <
     0.01 * dt * // continous time probability
     Math.exp(-sum * // more there is object, more it is rare to create new ones
     (1 + Math.exp(-(player-1)/2)) // first rounds have less items
