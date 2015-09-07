@@ -254,7 +254,7 @@ function maybeCreateInc () {
     return o[6];
   }, 0);
   // create inc is ruled with probabilities
-  if (Math.random() <
+  if (Math.random() < 0.1+
     0.01 * dt * // continous time probability
     Math.exp(-sum * // more there is object, more it is rare to create new ones
     (1 + Math.exp(-(player-1)/2)) // first rounds have less items
@@ -301,6 +301,10 @@ function createInc () {
 
   var ampRot = Math.PI * (0.5 * Math.random() + 0.5 * Math.random() * pRotAmp) * pRotAmp;
   var lvl = Math.floor(2 + 3 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
+  var ampRotRatio =
+    player > 2 && Math.random() > 0.5 + 0.5 * ((player-3)%8)/8 - 0.4 * Math.exp(-player/10) ?
+    0.9  - 0.5 * pRotAmpRatio - 0.2 * pRotAmp :
+    1;
 
   incomingObjects.push([
     pos,
@@ -322,7 +326,7 @@ function createInc () {
     ampRot,
     // amplitude rotation valid ratio
     // FIXME: make it higher in lower level but ensure it doesn't come up before the "careful with RED" message
-    ampRot > 0.8-pRotAmpRatio ? 1 - 0.6 * pRotAmpRatio - 0.2 * pRotAmp : 1,
+    ampRotRatio,
     // explode time
     0
   ]);
@@ -1338,7 +1342,7 @@ function drawUI () {
           currentMessage = "AHAH! NOW LETS SEND...";
           currentMessage2 = "...SOME UFOS !!!";
         }
-        else if (player===3 && 5000<playingSince && playingSince<15000) {
+        else if (player===3 && 5000<playingSince) {
           currentMessageClr = "#7cf";
           currentMessageClr2 = "#f66";
           currentMessage = "CAREFUL ABOUT THE";
@@ -1581,7 +1585,7 @@ function render (_t) {
 requestAnimationFrame(render);
 
 if (DEBUG) {
-  /*
+
 
   playingSince=-1;
 
@@ -1590,7 +1594,7 @@ if (DEBUG) {
     player += 1;
     incomingObjects = [];
     console.log("player=", player);
-
+    /*
     var a = 2 * Math.PI * Math.random();
     ufos.push([
       W * Math.random(),
@@ -1599,8 +1603,9 @@ if (DEBUG) {
       0.1 * Math.sin(a),
       0
     ]);
+    */
   });
-  */
+
 
   /*
   setInterval(function () {
