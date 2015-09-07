@@ -32,5 +32,5 @@ void main() {
       0.5 * texture2D(E, pos).rgb
     )
   )
-  * mix(1.0, smoothstep(1.0, 0.0, dd), 0.5), 1.0);
+  * mix(1.0, smoothstep(1.0, 0.0, dd), 0.6), 1.0);
 }

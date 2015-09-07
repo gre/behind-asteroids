@@ -28,11 +28,13 @@ PERSISTENCE_FRAG
 PLAYER_FRAG
 audio
 play
+stop
 */
 
 
 
 /* TODO list
+- mobile: why no combos?
 - Polish the AI
 - gfx
   - small fuel booster
@@ -52,11 +54,7 @@ var gl = c.getContext("webgl"),
   W = FW - 2 * GAME_MARGIN,
   H = FH - GAME_MARGIN - GAME_TOP_MARGIN,
   borderLength = 2*(W+H+2*GAME_INC_PADDING),
-  SEED = Math.random(),
-  excitementSmoothed = 0,
-  neverPlayed = 1,
-  neverUFOs = 1,
-  combos = 0;
+  SEED = Math.random();
 
 d.style.width = FW + "px";
 g.width = c.width = W;
@@ -97,8 +95,7 @@ var AsendFail = audio([1,,0.04,,0.45,0.14,0.06,-0.06,0.02,0.87,0.95,-0.02,,0.318
 var Alost = audio([0,0.11,0.37,,0.92,0.15,,-0.06,-0.04,0.29,0.14,0.1,,0.5047,,,,,0.16,-0.02,,,,0.7]);
 var Acoin = audio([0,,0.0941,0.29,0.42,0.563,,,,,,0.4399,0.5658,,,,,,1,,,,,0.5]);
 var Amsg = audio([2,0.07,0.1,,0.2,0.75,0.35,-0.1,0.12,,,-0.02,,,,,-0.06,-0.0377,0.26,,,0.8,,0.7]);
-var Aufo = audio([2,0.5,0.5,,1,0.5,,,,0.46,0.29,,,,,,,,1,,,,,0.5]);
-
+var Aufo = audio([2,0.05,0.8,,0.05,0.5,,,,0.46,0.29,,,,,,,,1,,,,,0.5]);
 
 // set up WebGL layer
 
@@ -145,7 +142,7 @@ var t = 0, dt,
 
   spaceship = [ W/2, H/2, 0, 0, 0 ], // [x, y, velx, vely, rot]
   asteroids = [], // array of [x, y, rot, vel, shape, lvl]
-  ufos = [], // array of [x, y, vx, vy]
+  ufos = [], // array of [x, y, vx, vy, timeBeforeShot]
   bullets = [], // array of [x, y, velx, vely, life, isAlien]
   incomingObjects = [], // array of: [pos, vel, ang, force, rotVel, shape, lvl, key, rotAmp, rotAmpValid, explodeTime]
   particles = [], // array of [x, y, rot, vel, life]
@@ -160,7 +157,13 @@ var t = 0, dt,
   player = 0,
   lifes = 0,
 
-  AIshoot = 0, AIboost = 0, AIrotate = 0, AIexcitement = 0;
+  AIshoot = 0, AIboost = 0, AIrotate = 0, AIexcitement = 0,
+
+  excitementSmoothed = 0,
+  neverPlayed = 1,
+  neverUFOs = 1,
+  combos = 0,
+  awaitingContinue = localStorage.pl && parseInt(localStorage.pl);
 
 randomAsteroids();
 
@@ -180,6 +183,13 @@ if (MOBILE) {
   });
 }
 else {
+  addEventListener("click", function (e) {
+    e.preventDefault();
+    var r = c.getBoundingClientRect();
+    var x = e.clientX-r.left;
+    var y = e.clientY-r.top;
+    tap = [ x, y ];
+  });
   addEventListener("keydown", function (e) {
     keys[e.which] = 1;
   });
@@ -311,6 +321,7 @@ function createInc () {
     // amplitude rotation
     ampRot,
     // amplitude rotation valid ratio
+    // FIXME: make it higher in lower level but ensure it doesn't come up before the "careful with RED" message
     ampRot > 0.8-pRotAmpRatio ? 1 - 0.6 * pRotAmpRatio - 0.2 * pRotAmp : 1,
     // explode time
     0
@@ -367,6 +378,19 @@ function explodeAsteroid (j) {
       ]);
     }
   }
+}
+
+function shoot (obj, vel, ang) {
+  var ax = Math.cos(ang);
+  var ay = Math.sin(ang);
+  bullets.push([
+    obj[0] + 14 * ax,
+    obj[1] + 14 * ay,
+    obj[2] + vel * ax,
+    obj[3] + vel * ay,
+    1000,
+    0
+  ]);
 }
 
 // GAME LOGIC
@@ -449,6 +473,22 @@ function applyIncLogic (o) {
   }
 }
 
+function applyUFOlogic (o) {
+  o[4] -= dt;
+  if (o[4]<0) {
+    o[4] = 500 + 300 * Math.random();
+    if (!dying) {
+      var target = Math.atan2(spaceship[1] - o[1], spaceship[0] - o[0]);
+      if (Math.random()<0.2) {
+        var randomAngle = 2*Math.PI*Math.random();
+        o[2] = 0.08 * Math.cos(randomAngle);
+        o[3] = 0.08 * Math.sin(randomAngle);
+      }
+      shoot(o, 0.3+0.1*Math.random(), target + 0.6 * Math.random() - 0.3);
+    }
+  }
+}
+
 // AI states
 // q1 and q2 are 2 quality expertise of the player
 function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
@@ -505,6 +545,13 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
         targetAsteroid = aPred;
         targetAsteroidWeight = w;
       }
+    }
+  }
+
+  for (i = 0; i < ufos.length; ++i) {
+    var u = ufos[i];
+    if (Math.random() < 0.02 * dt * (q1+q2+1)) {
+      targetAsteroid = u;
     }
   }
 
@@ -574,209 +621,226 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
     ang = normAngle(Math.atan2(y, x)-spaceship[4]);
     var angabs = Math.abs(ang);
     if (Math.random() < 0.06*dt*angabs) AIrotate = ang > 0 ? 1 : -1;
-    AIshoot = Math.random() < 0.003 * dt * (Math.exp(-angabs*10) + AIexcitement + q1);
+    AIshoot = Math.random() < 0.005 * dt * (Math.exp(-angabs*10) + AIexcitement + q1);
   }
 }
 
 var musicPhase = 0;
 var musicTick = 0;
 var musicPaused = 0;
+var ufoMusicTime = 0;
 
 function update () {
-  var i;
-  var nbSpaceshipBullets = 0;
-
-  if (!dying && playingSince>0 && t-musicPaused>5000 && player > 1) {
-
-    var combosTarget = 2 * player;
-    var musicFreq = 3*combos/combosTarget;
-    if (combos > combosTarget) {
-      musicPaused = t;
-      neverUFOs = combos = 0;
-      var a = 2 * Math.PI * Math.random();
-      ufos.push([
-        W * Math.random(),
-        H * Math.random(),
-        0.1 * Math.cos(a),
-        0.1 * Math.sin(a)
-      ]);
-    }
-
-    musicPhase += musicFreq*2*Math.PI*dt/1000;
-    if ((Math.sin(musicPhase) > 0) !== musicTick) {
-      musicTick = !musicTick;
-      play(musicTick ? Amusic1 : Amusic2);
-    }
-  }
-
-  // randomly send some asteroids
-  /*
-  if (Math.random() < 0.001 * dt)
-    randomInGameAsteroid();
-  */
-
-  // player lifecycle
-
   playingSince += dt;
 
-  if (lifes == 0 && playingSince > 0) {
-    // player enter
-    resurrectionTime = t;
-    lifes = 4;
-    player ++;
-    score = 0;
-    scoreForLife = 0;
-    asteroids = [];
-    ufos = [];
-    play(Acoin);
+  if (t-ufoMusicTime>200) {
+    ufoMusicTime = t;
+    if (ufos.length)
+      play(Aufo);
   }
 
-  // inc lifecycle
-
-  if (playingSince > 1000 && !dying) {
-    for (i = 0; i < incomingObjects.length; i++) {
-      var o = incomingObjects[i];
-      if (!o[10]) {
-        var p = incPosition(o);
-        var matchingTap = tap && circleCollides(tap, p, 40 + 10 * o[6]);
-        if (keys[o[7]] || matchingTap) {
-          // send an asteroid
-          neverPlayed = tap = keys[o[7]] = 0;
-          if (sendAsteroid(o)) {
-            if (player > 1) combos ++;
-            incomingObjects.splice(i--, 1);
-          }
-          else {
-            combos = 0;
-            o[10] = t;
-          }
-        }
+  if (awaitingContinue) {
+    if (playingSince>0 && tap && 140<tap[1] && tap[1]<280) {
+      // continue game action
+      if (tap[0]<W/2) { // YES
+        player = awaitingContinue-1;
+        playingSince = awaitingContinue = 0;
       }
-      else {
-        if (t-o[10] > 1000)
-          incomingObjects.splice(i--, 1);
+      else { // NO
+        playingSince = awaitingContinue = 0;
+        localStorage.pl = "";
       }
     }
     tap = 0;
-
-    while(maybeCreateInc());
   }
+  else {
 
-  // spaceship lifecycle
+    var i;
+    var nbSpaceshipBullets = 0;
 
-  if (dying && t-dying > 2000 + (lifes>1 ? 0 : 2000)) {
-    dying = 0;
-    spaceship = [ W/2, H/2, 0, 0, 0 ];
-    if (--lifes) {
-      resurrectionTime = t;
-    }
-    else {
-      // Player lost. game over
-      playingSince = -5000;
-      randomAsteroids();
-      ufos = [];
-      play(Alost);
-    }
-  }
+    if (!dying && playingSince>0 && t-musicPaused>5000 && player > 1) {
 
-  // collision
-
-  bullets.forEach(function (bull, i) {
-    if (!bull[5]) nbSpaceshipBullets ++;
-    var j;
-
-    /*
-    // bullet-spaceship collision
-    if (!dying && bull[4]<270 && circleCollides(bull, spaceship, 20)) {
-      explose(bull);
-      bullets.splice(i, 1);
-      spaceshipDie();
-      return;
-    }
-    */
-
-    /*
-    for (j = 0; j < aliens.length; ++j) {
-      var alien = aliens[j];
-      if (circleCollides(bull, alien, 20)) {
-        explose(bull);
-        bullets.splice(i, 1);
-        aliens.splice(j, 1);
-        return;
-      }
-    }
-    */
-
-    for (j = 0; j < asteroids.length; ++j) {
-      var aster = asteroids[j];
-      var lvl = aster[5];
-      // bullet-asteroid collision
-      if (circleCollides(bull, aster, 10 * lvl)) {
-        explose(bull);
-        bullets.splice(i, 1);
-        explodeAsteroid(j);
-        var s = 20 * Math.floor(0.4 * (6 - lvl) * (6 - lvl));
-        score += s;
-        scoreForLife += s;
-        if (scoreForLife > 10000) {
-          lifes ++;
-          scoreForLife = 0;
-        }
-        best = Math.max(best, score);
-        return;
-      }
-    }
-  });
-
-  if (!dying && playingSince > 0) asteroids.forEach(function (aster, j) {
-    // asteroid-spaceship collision
-    if (circleCollides(aster, spaceship, 10 + 10 * aster[5])) {
-      if (t - resurrectionTime < 1000) {
-        // if spaceship just resurect, will explode the asteroid
-        explodeAsteroid(j);
-      }
-      else {
-        // otherwise, player die
-        explose(spaceship);
-        spaceshipDie();
-      }
-    }
-  });
-
-  // run spaceship AI
-  AIexcitement = 0;
-  if (!dying && playingSince > 0) {
-    var ax = Math.cos(spaceship[4]);
-    var ay = Math.sin(spaceship[4]);
-
-    var quality =
-      1-Math.exp((1-player)/4) +
-      1-Math.exp((1-player)/8);
-    var rep = Math.random();
-    var mix = Math.exp((1-player)/16);
-    rep = rep * mix + 0.5 * (1-mix);
-    var q1 = Math.min(1, rep * quality);
-    var q2 = quality - q1;
-
-    // ai logic (determine the 3 inputs)
-    aiLogic(q1, q2);
-
-    // apply ai inputs with game logic
-
-    spaceship[2] += AIboost * dt * 0.0002 * ax;
-    spaceship[3] += AIboost * dt * 0.0002 * ay;
-    spaceship[4] = normAngle(spaceship[4] + AIrotate * dt * 0.005);
-    if (nbSpaceshipBullets < 3) {
-      if (AIshoot) {
-        play(Ashot);
-        bullets.push([
-          spaceship[0] + 14 * ax,
-          spaceship[1] + 14 * ay,
-          spaceship[2] + 0.3 * ax,
-          spaceship[3] + 0.3 * ay,
-          1000,
+      var combosTarget = 2 * player;
+      var musicFreq = 3*combos/combosTarget;
+      if (combos > combosTarget) {
+        musicPaused = t;
+        neverUFOs = combos = 0;
+        ufos.push([
+          W * Math.random(),
+          H * Math.random(),
+          0,
+          0,
           0
         ]);
+      }
+
+      musicPhase += musicFreq*2*Math.PI*dt/1000;
+      if ((Math.sin(musicPhase) > 0) !== musicTick) {
+        musicTick = !musicTick;
+        play(musicTick ? Amusic1 : Amusic2);
+      }
+    }
+
+    // randomly send some asteroids
+    /*
+    if (Math.random() < 0.001 * dt)
+      randomInGameAsteroid();
+    */
+
+    // player lifecycle
+
+    if (lifes == 0 && playingSince > 0) {
+      // player enter
+      resurrectionTime = t;
+      lifes = 4;
+      player++;
+      score = 0;
+      scoreForLife = 0;
+      asteroids = [];
+      ufos = [];
+      play(Acoin);
+      if (player > 1) localStorage.pl = player;
+    }
+
+    // inc lifecycle
+
+    if (playingSince > 1000 && !dying) {
+      for (i = 0; i < incomingObjects.length; i++) {
+        var o = incomingObjects[i];
+        if (!o[10]) {
+          var p = incPosition(o);
+          var matchingTap = tap && circleCollides(tap, p, 40 + 10 * o[6]);
+          if (keys[o[7]] || matchingTap) {
+            // send an asteroid
+            neverPlayed = tap = keys[o[7]] = 0;
+            if (sendAsteroid(o)) {
+              if (player > 1) combos ++;
+              incomingObjects.splice(i--, 1);
+            }
+            else {
+              combos = 0;
+              o[10] = t;
+            }
+          }
+        }
+        else {
+          if (t-o[10] > 1000)
+            incomingObjects.splice(i--, 1);
+        }
+      }
+      tap = 0;
+
+      while(maybeCreateInc());
+    }
+
+    // spaceship lifecycle
+
+    if (dying && t-dying > 2000 + (lifes>1 ? 0 : 2000)) {
+      dying = 0;
+      spaceship = [ W/2, H/2, 0, 0, 0 ];
+      if (--lifes) {
+        resurrectionTime = t;
+      }
+      else {
+        // Player lost. game over
+        playingSince = -5000;
+        randomAsteroids();
+        ufos = [];
+        play(Alost);
+      }
+    }
+
+    // collision
+
+    bullets.forEach(function (bull, i) {
+      if (!bull[5]) nbSpaceshipBullets ++;
+      var j;
+
+      if (bull[4]<900) {
+        // bullet-spaceship collision
+        if (!dying && circleCollides(bull, spaceship, 20)) {
+          explose(bull);
+          bullets.splice(i, 1);
+          spaceshipDie();
+          return;
+        }
+
+        // bullet-ufo collision
+        for (j = 0; j < ufos.length; ++j) {
+          var ufo = ufos[j];
+          if (circleCollides(bull, ufo, 20)) {
+            explose(bull);
+            bullets.splice(i, 1);
+            ufos.splice(j, 1);
+            return;
+          }
+        }
+      }
+
+      for (j = 0; j < asteroids.length; ++j) {
+        var aster = asteroids[j];
+        var lvl = aster[5];
+        // bullet-asteroid collision
+        if (circleCollides(bull, aster, 10 * lvl)) {
+          explose(bull);
+          bullets.splice(i, 1);
+          explodeAsteroid(j);
+          var s = 20 * Math.floor(0.4 * (6 - lvl) * (6 - lvl));
+          score += s;
+          scoreForLife += s;
+          if (scoreForLife > 10000) {
+            lifes ++;
+            scoreForLife = 0;
+          }
+          best = Math.max(best, score);
+          return;
+        }
+      }
+    });
+
+    if (!dying && playingSince > 0) asteroids.forEach(function (aster, j) {
+      // asteroid-spaceship collision
+      if (circleCollides(aster, spaceship, 10 + 10 * aster[5])) {
+        if (t - resurrectionTime < 1000) {
+          // if spaceship just resurect, will explode the asteroid
+          explodeAsteroid(j);
+        }
+        else {
+          // otherwise, player die
+          explose(spaceship);
+          spaceshipDie();
+        }
+      }
+    });
+
+    // run spaceship AI
+    AIexcitement = 0;
+    if (!dying && playingSince > 0) {
+      var ax = Math.cos(spaceship[4]);
+      var ay = Math.sin(spaceship[4]);
+
+      var quality =
+        1-Math.exp((1-player)/4) +
+        1-Math.exp((1-player)/8);
+      var rep = Math.random();
+      var mix = Math.exp((1-player)/16);
+      rep = rep * mix + 0.5 * (1-mix);
+      var q1 = Math.min(1, rep * quality);
+      var q2 = quality - q1;
+
+      // ai logic (determine the 3 inputs)
+      aiLogic(q1, q2);
+
+      // apply ai inputs with game logic
+
+      spaceship[2] += AIboost * dt * 0.0002 * ax;
+      spaceship[3] += AIboost * dt * 0.0002 * ay;
+      spaceship[4] = normAngle(spaceship[4] + AIrotate * dt * 0.005);
+      if (nbSpaceshipBullets < 3) {
+        if (AIshoot) {
+          play(Ashot);
+          shoot(spaceship, 0.3, spaceship[4]);
+        }
       }
     }
   }
@@ -787,11 +851,12 @@ function update () {
   bullets.forEach(euclidPhysics);
   particles.forEach(polarPhysics);
 
+  ufos.forEach(applyUFOlogic);
   incomingObjects.forEach(applyIncLogic);
 
   particles.forEach(applyLife);
   loopOutOfBox(spaceship);
-  asteroids.forEach(playingSince > 0 ? destroyOutOfBox : loopOutOfBox);
+  asteroids.forEach(playingSince > 0 && !awaitingContinue ? destroyOutOfBox : loopOutOfBox);
   ufos.forEach(loopOutOfBox);
   bullets.forEach(applyLife);
   bullets.forEach(loopOutOfBox);
@@ -944,11 +1009,6 @@ function drawUFO () {
       [22,9]
     ]));
   ctx.stroke();
-
-  ctx.translate(11, 20);
-  ctx.globalAlpha = 0.2;
-  font("NOT IMPLEMENTED!", 0.5);
-  ctx.stroke();
 }
 
 function drawBullet () {
@@ -982,7 +1042,7 @@ function drawGameUI () {
   font(scoreTxt(score), 1.5, 1);
   ctx.restore();
 
-  if (playingSince < 0) {
+  if (playingSince < 0 || awaitingContinue) {
     ctx.save();
     ctx.translate(W-50, 20);
     font(scoreTxt(0), 1.5, -1);
@@ -1029,6 +1089,25 @@ function drawGameUI () {
     font("GAME OVER", 2);
     ctx.restore();
   }
+  if (awaitingContinue && playingSince > 0) {
+    ctx.save();
+    ctx.translate(W/2, 100);
+    font("CONTINUE GAME ?", 2);
+    ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.translate(W/4, 180);
+    font("YES", MOBILE ? 4 : 6);
+    ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.translate(3*W/4, 180);
+    font("NO", MOBILE ? 4 : 6);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.save();
   ctx.translate(W/2, H-14);
   font("2015 GREWEB INC", .6);
@@ -1069,7 +1148,7 @@ function draw () {
   renderCollection(bullets, drawBullet);
   renderCollection(particles, drawParticle);
 
-  if (playingSince > 0) {
+  if (playingSince > 0 && !awaitingContinue) {
     ctx.save();
     translateTo(spaceship);
     drawSpaceship(spaceship);
@@ -1177,6 +1256,18 @@ function drawUI () {
     currentMessageClr = "#f7c",
     currentMessageClr2 = "#7fc";
 
+  function announcePlayer (player) {
+    currentMessage = "PLAYER "+player;
+    currentMessage2 = [
+      "GENIOUS PLAYER!!",
+      "EXPERIENCED PLAYER!!",
+      "GOOD PLAYER. GET READY",
+      "NICE PLAYER.",
+      "BEGINNER.",
+      "VERY BEGINNER. EASY KILL"
+    ][Math.floor(Math.exp((-player)/8)*6)];
+  }
+
   if (!player) {
     if (playingSince<-7000) {
       currentMessage = "BEHIND ASTEROIDS";
@@ -1187,12 +1278,16 @@ function drawUI () {
       currentMessage = "SEND ASTEROIDS TO MAKE";
       currentMessage2 = "PLAYERS WASTE THEIR MONEY";
     }
-    else {
+    else if (!awaitingContinue) {
       var nb = Math.min(25, Math.floor((playingSince+3500)/80));
       for (var i=0; i<nb; i++)
         currentMessage += ".";
       if (playingSince>-2000)
         currentMessage2 = "A NEW PLAYER!";
+    }
+    else {
+      if (playingSince<0) playingSince = 0; // jump to skip the "player coming"
+      announcePlayer(awaitingContinue);
     }
   }
   else if (dying) {
@@ -1223,15 +1318,7 @@ function drawUI () {
       currentMessage2 = "25¢ 25¢ 25¢ 25¢ 25¢";
     }
     else if (playingSince<6000 && lifes==4) {
-      currentMessage = "PLAYER "+player;
-      currentMessage2 = [
-        "GENIOUS PLAYER!!",
-        "EXPERIENCED PLAYER!!",
-        "GOOD PLAYER. GET READY",
-        "NICE PLAYER.",
-        "BEGINNER.",
-        "VERY BEGINNER. EASY KILL"
-      ][Math.floor(Math.exp((-player)/8)*6)];
+      announcePlayer(player);
     }
     else {
       currentMessageClr2 = "#f66";
@@ -1284,7 +1371,7 @@ function drawUI () {
   ctx.translate(FW - GAME_MARGIN, 2);
   ctx.lineWidth = 2;
   ctx.strokeStyle = "#7cf";
-  font((player*25)+"¢", 2, -1);
+  font(((playingSince>0&&awaitingContinue||player)*25)+"¢", 2, -1);
   ctx.restore();
 
   ctx.save();
@@ -1299,6 +1386,7 @@ function drawUI () {
   ctx.translate(0, MOBILE ? 30 : 40);
   font(lastMessage2 = currentMessage2, MOBILE ? 1.5 : 2, 1);
   ctx.restore();
+  ctx.restore();
 
   ctx.save();
   ctx.strokeStyle = "#7cf";
@@ -1306,7 +1394,6 @@ function drawUI () {
   if (combos) font(combos+"x", 1.5, -1);
   ctx.restore();
 
-  ctx.restore();
 }
 
 
@@ -1342,7 +1429,6 @@ function render (_t) {
   t += dt; // accumulate the game time (that is not the same as _t)
 
   // UPDATE game
-
   update();
 
   // RENDER game
@@ -1496,12 +1582,23 @@ requestAnimationFrame(render);
 
 if (DEBUG) {
   /*
+
   playingSince=-1;
+
   addEventListener("dblclick", function () {
     playingSince = -1;
     player += 1;
     incomingObjects = [];
     console.log("player=", player);
+
+    var a = 2 * Math.PI * Math.random();
+    ufos.push([
+      W * Math.random(),
+      H * Math.random(),
+      0.1 * Math.cos(a),
+      0.1 * Math.sin(a),
+      0
+    ]);
   });
   */
 
