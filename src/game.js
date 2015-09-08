@@ -3,6 +3,7 @@ DEBUG
 MOBILE
 smoothstep
 normAngle
+scoreTxt
 font
 path
 glCreateFBO
@@ -34,15 +35,12 @@ stop
 
 
 /* TODO list
-- mobile: why no combos?
-- Polish the AI
-- gfx
+- improve the AI
+- polish gfx
   - small fuel booster
-- game features (if time)
-  - UFO "bonus"
 */
 
-var gl = c.getContext("webgl"),
+var gl = c.getContext("webgl") || c.getContext("experimental-webgl"),
   ctx,
   gameCtx = g.getContext("2d"),
   uiCtx = u.getContext("2d"),
@@ -135,6 +133,8 @@ var fbo2 = glCreateFBO();
 var textureGame = glCreateTexture();
 
 
+if (!localStorage.ach) localStorage.ach = [0,0,0];
+
 
 /// GAME STATE
 
@@ -158,12 +158,18 @@ var t = 0, dt,
   lifes = 0,
 
   AIshoot = 0, AIboost = 0, AIrotate = 0, AIexcitement = 0,
+  AIboostSmoothed = 0,
 
   excitementSmoothed = 0,
   neverPlayed = 1,
   neverUFOs = 1,
   combos = 0,
-  awaitingContinue = localStorage.pl && parseInt(localStorage.pl);
+  awaitingContinue = localStorage.pl && parseInt(localStorage.pl),
+  // achievements: nbAsteroids, nbKills, nbUfos
+  achievements =
+    localStorage.ach.split(",").map(function (v) {
+      return parseInt(v, 10);
+    });
 
 randomAsteroids();
 
@@ -257,13 +263,9 @@ function maybeCreateInc () {
   if (Math.random() <
     0.01 * dt * // continous time probability
     Math.exp(-sum * // more there is object, more it is rare to create new ones
-    (1 + Math.exp(-(player-1)/2)) // first rounds have less items
+    (1 + 5 * Math.exp(-(player-1)/3) - 0.2 * Math.exp(-Math.abs(player-20)/20)) // first rounds have less items
     ) *
-    (1 - Math.exp(-playingSince / 15000)) * // 0% to 50% in 0 to 10 sec of beginning
-    (
-      0.5 +
-      0.5 * Math.exp(-Math.max(0, (player-10)/10)) // items decrease after round 10
-    )
+    (1 - Math.exp(-playingSince / 5000))
   )
     return createInc();
 }
@@ -450,6 +452,8 @@ function spaceshipDie() {
   if (dying) return;
   dying = t;
   deads ++;
+  achievements[1] ++;
+  localStorage.ach = achievements;
 }
 
 function dist (a, b) { // REMOVE and replace by length?
@@ -662,7 +666,7 @@ function update () {
     var i;
     var nbSpaceshipBullets = 0;
 
-    if (!dying && playingSince>0 && t-musicPaused>5000 && player > 1) {
+    if (!dying && playingSince>0 && t-musicPaused>5000 && player > 1 && !ufos.length) {
 
       var combosTarget = 2 * player;
       var musicFreq = 3*combos/combosTarget;
@@ -676,6 +680,8 @@ function update () {
           0,
           0
         ]);
+        achievements[2] ++;
+        localStorage.ach = achievements;
       }
 
       musicPhase += musicFreq*2*Math.PI*dt/1000;
@@ -718,6 +724,8 @@ function update () {
             // send an asteroid
             neverPlayed = tap = keys[o[7]] = 0;
             if (sendAsteroid(o)) {
+              achievements[0] ++;
+              localStorage.ach = achievements;
               if (player > 1) combos ++;
               incomingObjects.splice(i--, 1);
             }
@@ -866,6 +874,7 @@ function update () {
   bullets.forEach(loopOutOfBox);
 
   excitementSmoothed += 0.04 * (AIexcitement - excitementSmoothed);
+  AIboostSmoothed += 0.04 * (AIboost - AIboostSmoothed);
 }
 
 
@@ -973,6 +982,13 @@ function drawSpaceship (o) {
       [ -5, 0]
     ]);
     ctx.stroke();
+    if (AIboostSmoothed>0.2) {
+      path([
+        [-6, 2*Math.random()-1],
+        [-10, 2*Math.random()-1]
+      ]);
+      ctx.stroke();
+    }
   }
 }
 
@@ -983,35 +999,39 @@ function drawAsteroid (o) {
   ctx.stroke();
 }
 
+
+var UFOa = [
+  [8,0],
+  [7,5],
+  [0,9],
+  [7,14]
+];
+var UFOb = [
+  [15,14],
+  [22,9],
+  [15,5],
+  [14,0]
+];
+
+var UFO =
+  UFOa
+  .concat(UFOb)
+  .concat(UFOa)
+  .concat([,])
+  .concat(UFOb)
+  .concat([
+    ,
+    [7,5],
+    [15,5],
+    ,
+    [0,9],
+    [22,9]
+  ]);
+
 function drawUFO () {
   ctx.globalAlpha = 0.4;
   ctx.strokeStyle = "#f00";
-  var a = [
-    [8,0],
-    [7,5],
-    [0,9],
-    [7,14]
-  ];
-  var b = [
-    [15,14],
-    [22,9],
-    [15,5],
-    [14,0]
-  ];
-  path(
-    a
-    .concat(b)
-    .concat(a)
-    .concat([,])
-    .concat(b)
-    .concat([
-      ,
-      [7,5],
-      [15,5],
-      ,
-      [0,9],
-      [22,9]
-    ]));
+  path(UFO);
   ctx.stroke();
 }
 
@@ -1034,7 +1054,6 @@ function drawGameUI () {
   ctx.save();
   ctx.fillStyle = ctx.strokeStyle = "#0f0";
   ctx.globalAlpha = 0.3;
-
 
   ctx.save();
   ctx.translate(W/2, 20);
@@ -1097,25 +1116,34 @@ function drawGameUI () {
     ctx.save();
     ctx.translate(W/2, 100);
     font("CONTINUE GAME ?", 2);
-    ctx.stroke();
     ctx.restore();
     ctx.save();
     ctx.globalAlpha = 1;
     ctx.translate(W/4, 180);
     font("YES", MOBILE ? 4 : 6);
-    ctx.stroke();
     ctx.restore();
     ctx.save();
     ctx.globalAlpha = 1;
     ctx.translate(3*W/4, 180);
     font("NO", MOBILE ? 4 : 6);
-    ctx.stroke();
     ctx.restore();
   }
   ctx.save();
   ctx.translate(W/2, H-14);
   font("2015 GREWEB INC", .6);
   ctx.restore();
+
+  if (playingSince<0 && t%1000<800) {
+    ctx.save();
+    ctx.translate(W-20, H-24);
+    font(MOBILE ? "MOBILE" : "DESKTOP", .6, -1);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(W-20, H-14);
+    font("VERSION", .6, -1);
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
@@ -1141,7 +1169,7 @@ function drawGlitch () {
   ctx.restore();
 }
 
-function draw () {
+function drawGame () {
   ctx.save();
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
@@ -1250,6 +1278,37 @@ function drawInc (o) {
   }
 }
 
+
+var badgesIcons = [
+  [
+    [-11, -11],
+    [4, -13],
+    [6, -6],
+    [14, 0],
+    [14, 8],
+    [6, 8],
+    [-6, 14],
+    [-14, 0]
+  ],
+  [
+    [-8, 13],
+    [0, -13],
+    [8, 13],
+    [0, 11],
+    [-8, 13],
+    ,
+    [-10, -2],
+    [10, 2],
+    ,
+    [10, -2],
+    [-10, 2],
+    ,
+  ],
+  UFO.map(function (p) {
+    return p ? [p[0]-11,p[1]-7] : p;
+  })
+];
+
 var lastStatement, lastStatementTime = 0;
 
 var lastMessage2;
@@ -1348,7 +1407,7 @@ function drawUI () {
           currentMessage = "CAREFUL ABOUT THE";
           currentMessage2 = "RED";
         }
-        else {
+        else if (player > 5) {
           lastStatement = 0;
           if (Math.random() < 0.0001 * dt && t - lastStatementTime > 8000) {
             currentMessage2 = [
@@ -1398,83 +1457,23 @@ function drawUI () {
   if (combos) font(combos+"x", 1.5, -1);
   ctx.restore();
 
-}
-
-
-function scoreTxt (s) {
-  return (s<=9?"0":"")+s;
-}
-
-// Game Post Effects
-
-// Main Code
-
-function translateTo (p) {
-  ctx.translate(p[0], p[1]);
-}
-function renderCollection (coll, draw) {
-  for (var i=0; i<coll.length; ++i) {
-    ctx.save();
-    translateTo(coll[i]);
-    draw(coll[i]);
-    ctx.restore();
+  for (var j = 0; j < 3; j++) {
+    var badge = achievements[j];
+    if (badge) {
+      ctx.save();
+      ctx.strokeStyle = "#fc7";
+      ctx.translate(GAME_MARGIN + 50 + 100 * j, FH - 20);
+      path(badgesIcons[j]);
+      ctx.stroke();
+      ctx.translate(0, -30);
+      font(""+badge, 1);
+      ctx.restore();
+    }
   }
 }
 
-var _lastT;
-function render (_t) {
-  requestAnimationFrame(render);
-  if (!_lastT) _lastT = _t;
-  dt = Math.min(100, _t-_lastT);
-  _lastT = _t;
 
-  checkSize();
-
-  t += dt; // accumulate the game time (that is not the same as _t)
-
-  // UPDATE game
-  update();
-
-  // RENDER game
-
-  // UI Rendering
-
-  ctx = uiCtx;
-
-  ctx.save();
-
-  ctx.scale(uiScale, uiScale);
-
-  ctx.save();
-  ctx.clearRect(0, 0, FW, FH);
-
-  drawUI();
-
-  ctx.translate(GAME_MARGIN, GAME_TOP_MARGIN);
-
-  incomingObjects.forEach(function (inc) {
-    ctx.save();
-    translateTo(incPosition(inc));
-    drawInc(inc);
-    ctx.restore();
-  });
-
-  ctx.restore();
-
-  ctx.restore();
-
-  // Game rendering
-
-  ctx = gameCtx;
-
-  ctx.save();
-
-  draw();
-
-  ctx.restore();
-
-  // WEBGL after effects
-
+function drawPostProcessing () {
   glSetTexture(textureGame, g);
 
   // Laser
@@ -1582,12 +1581,86 @@ function render (_t) {
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
+
+// Game Post Effects
+
+// Main Code
+
+function translateTo (p) {
+  ctx.translate(p[0], p[1]);
+}
+function renderCollection (coll, draw) {
+  for (var i=0; i<coll.length; ++i) {
+    ctx.save();
+    translateTo(coll[i]);
+    draw(coll[i]);
+    ctx.restore();
+  }
+}
+
+var _lastT;
+function render (_t) {
+  requestAnimationFrame(render);
+  if (!_lastT) _lastT = _t;
+  dt = Math.min(100, _t-_lastT);
+  _lastT = _t;
+
+  checkSize();
+
+  t += dt; // accumulate the game time (that is not the same as _t)
+
+  // UPDATE game
+  update();
+
+  // RENDER game
+
+  // UI Rendering
+
+  ctx = uiCtx;
+
+  ctx.save();
+
+  ctx.scale(uiScale, uiScale);
+
+  ctx.save();
+  ctx.clearRect(0, 0, FW, FH);
+
+  drawUI();
+
+  ctx.translate(GAME_MARGIN, GAME_TOP_MARGIN);
+
+  incomingObjects.forEach(function (inc) {
+    ctx.save();
+    translateTo(incPosition(inc));
+    drawInc(inc);
+    ctx.restore();
+  });
+
+  ctx.restore();
+
+  ctx.restore();
+
+  // Game rendering
+
+  ctx = gameCtx;
+
+  ctx.save();
+
+  drawGame();
+
+  ctx.restore();
+
+  // WEBGL after effects
+
+  drawPostProcessing();
+}
+
 requestAnimationFrame(render);
 
 if (DEBUG) {
 
 
-  playingSince=-1;
+  //playingSince=-1;
 
   addEventListener("dblclick", function () {
     playingSince = -1;
