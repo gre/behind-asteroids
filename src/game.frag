@@ -20,9 +20,11 @@ void main() {
   float dd = smoothstep(0.45, 0.51, d);
   pos = mix(pos, vec2(0.5), 0.2 * (0.6 - d) - 0.02 * d);
 
+  vec3 gc = texture2D(G, pos).rgb;
+
   gl_FragColor = vec4((
     vec3(0.03, 0.04, 0.05) +
-    mix(0.5, 2.0, s) * texture2D(G, pos).rgb +
+    mix(vec3(0.05, 0.1, 0.15) - gc, 2.0 * gc, s) +
     s * (
       texture2D(L, pos).rgb +
       vec3(0.3, 0.6, 1.0) * (
