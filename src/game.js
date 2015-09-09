@@ -211,7 +211,7 @@ function sendAsteroid (o) {
     var rot = incRotation(o);
     var x = Math.max(0, Math.min(p[0], W));
     var y = Math.max(0, Math.min(p[1], H));
-    var vel = 0.007 * o[3];
+    var vel = 0.008 * o[3];
     var lvl = o[6];
     var shape = o[5];
     asteroids.push([ x, y, rot, vel, shape, lvl ]);
@@ -879,7 +879,7 @@ function update () {
       var ax = Math.cos(spaceship[4]);
       var ay = Math.sin(spaceship[4]);
 
-      var quality = 0.2 +
+      var quality = 0.1 +
         1-Math.exp((1-player)/4) +
         1-Math.exp((1-player)/8);
       var rep = Math.random();
