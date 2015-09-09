@@ -22,7 +22,7 @@ void main() {
 
   gl_FragColor = vec4((
     vec3(0.03, 0.04, 0.05) +
-    mix(0.3, 2.0, s) * texture2D(G, pos).rgb +
+    mix(0.5, 2.0, s) * texture2D(G, pos).rgb +
     s * (
       texture2D(L, pos).rgb +
       vec3(0.3, 0.6, 1.0) * (
