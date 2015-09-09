@@ -1798,6 +1798,11 @@ if (DEBUG) {
     player += 1;
     incomingObjects = [];
     console.log("player=", player);
+
+
+    player = 42;
+    achievements = [123, 45, 6];
+    gameOver = 1;
     /*
     var a = 2 * Math.PI * Math.random();
     ufos.push([
