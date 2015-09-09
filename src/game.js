@@ -36,8 +36,6 @@ stop
 
 /* TODO list
 - improve the AI
-- polish gfx
-  - small fuel booster
 */
 
 var gl = c.getContext("webgl") || c.getContext("experimental-webgl"),
@@ -133,7 +131,7 @@ var fbo2 = glCreateFBO();
 var textureGame = glCreateTexture();
 
 
-if (!localStorage.ach) localStorage.ach = [0,0,0];
+if (!localStorage.ba_ach) localStorage.ba_ach = [0,0,0];
 
 
 /// GAME STATE
@@ -164,10 +162,10 @@ var t = 0, dt,
   neverPlayed = 1,
   neverUFOs = 1,
   combos = 0,
-  awaitingContinue = localStorage.pl && parseInt(localStorage.pl),
+  awaitingContinue = localStorage.ba_pl && parseInt(localStorage.ba_pl),
   // achievements: nbAsteroids, nbKills, nbUfos
   achievements =
-    localStorage.ach.split(",").map(function (v) {
+    localStorage.ba_ach.split(",").map(function (v) {
       return parseInt(v, 10);
     });
 
@@ -301,12 +299,23 @@ function createInc () {
   var pRotAmpRatio = diffMin + Math.random() * (diffMax-diffMin);
   var pRotSpeed = diffMin + Math.random() * (diffMax-diffMin);
 
-  var ampRot = Math.PI * (0.5 * Math.random() + 0.5 * Math.random() * pRotAmp) * pRotAmp;
+  var ampRot = player<2 ? 0 : Math.PI * (0.5 * Math.random() + 0.8 * Math.random() * pRotAmp) * pRotAmp;
   var lvl = Math.floor(2 + 3 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
   var ampRotRatio =
-    player > 2 && Math.random() > 0.5 + 0.5 * ((player-3)%8)/8 - 0.4 * Math.exp(-player/10) ?
+    player > 2 &&
+    ampRot > Math.exp(-player/4) &&
+    Math.random() > 0.5 + 0.5 * ((player-3)%8)/8 - 0.4 * Math.exp(-player/10) ?
     0.9  - 0.5 * pRotAmpRatio - 0.2 * pRotAmp :
     1;
+
+  if (player == 2) {
+    ampRot = 0.2 + Math.random();
+  }
+
+  if (player == 3) {
+    ampRot = 0.2 + Math.random();
+    ampRotRatio = 0.5 + 0.4 * Math.random();
+  }
 
   incomingObjects.push([
     pos,
@@ -453,7 +462,7 @@ function spaceshipDie() {
   dying = t;
   deads ++;
   achievements[1] ++;
-  localStorage.ach = achievements;
+  localStorage.ba_ach = achievements;
 }
 
 function dist (a, b) { // REMOVE and replace by length?
@@ -656,7 +665,7 @@ function update () {
       }
       else { // NO
         playingSince = awaitingContinue = 0;
-        localStorage.pl = "";
+        localStorage.ba_pl = "";
       }
     }
     tap = 0;
@@ -681,7 +690,7 @@ function update () {
           0
         ]);
         achievements[2] ++;
-        localStorage.ach = achievements;
+        localStorage.ba_ach = achievements;
       }
 
       musicPhase += musicFreq*2*Math.PI*dt/1000;
@@ -709,7 +718,7 @@ function update () {
       asteroids = [];
       ufos = [];
       play(Acoin);
-      if (player > 1) localStorage.pl = player;
+      if (player > 1) localStorage.ba_pl = player;
     }
 
     // inc lifecycle
@@ -725,8 +734,8 @@ function update () {
             neverPlayed = tap = keys[o[7]] = 0;
             if (sendAsteroid(o)) {
               achievements[0] ++;
-              localStorage.ach = achievements;
-              if (player > 1) combos ++;
+              localStorage.ba_ach = achievements;
+              if (player > 3) combos ++;
               incomingObjects.splice(i--, 1);
             }
             else {
@@ -831,7 +840,7 @@ function update () {
       var ax = Math.cos(spaceship[4]);
       var ay = Math.sin(spaceship[4]);
 
-      var quality =
+      var quality = 0.4 +
         1-Math.exp((1-player)/4) +
         1-Math.exp((1-player)/8);
       var rep = Math.random();
@@ -984,8 +993,18 @@ function drawSpaceship (o) {
     ctx.stroke();
     if (AIboostSmoothed>0.2) {
       path([
-        [-6, 2*Math.random()-1],
-        [-10, 2*Math.random()-1]
+        [-7, 2*Math.random()-1],
+        [-7 - 5*AIboostSmoothed, 4*Math.random()-2]
+      ]);
+      ctx.stroke();
+    }
+    if (AIboostSmoothed<-0.2) {
+      path([
+        [2, -5],
+        [2 - 5 * AIboostSmoothed, -7],
+        ,
+        [2, 5],
+        [2 - 5 * AIboostSmoothed, 7]
       ]);
       ctx.stroke();
     }
@@ -1396,16 +1415,21 @@ function drawUI () {
             currentMessage2 = "TO SEND THEM TO THE GAME";
           }
         }
-        else if (player===2 && 5000<playingSince && neverUFOs) {
-          currentMessageClr = currentMessageClr2 = "#f66";
-          currentMessage = "AHAH! NOW LETS SEND...";
-          currentMessage2 = "...SOME UFOS !!!";
+        else if (player==2 && 5000<playingSince) {
+          currentMessageClr2 = currentMessageClr = "#7cf";
+          currentMessage = "LETS TRAIN WITH...";
+          currentMessage2 = "AIMING";
         }
-        else if (player===3 && 5000<playingSince) {
+        else if (player==3 && 5000<playingSince) {
           currentMessageClr = "#7cf";
           currentMessageClr2 = "#f66";
           currentMessage = "CAREFUL ABOUT THE";
-          currentMessage2 = "RED";
+          currentMessage2 = "RED AIMING";
+        }
+        else if (player==4 && 5000<playingSince && neverUFOs) {
+          currentMessageClr = currentMessageClr2 = "#f66";
+          currentMessage = "MAKE COMBOS TO SEND";
+          currentMessage2 = "AN UFO !!!";
         }
         else if (player > 5) {
           lastStatement = 0;
@@ -1492,22 +1516,22 @@ function drawPostProcessing () {
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(playerFbo), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  6, 0 );
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, 2 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo2);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  0, 2 );
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  -2, 2 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, 1 );
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  6, 0 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(playerFbo);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -1 );
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  0, 2 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   // Glare
@@ -1518,22 +1542,12 @@ function drawPostProcessing () {
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(glareFbo), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  1, -2 );
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-  glBindFBO(fbo2);
-  glBindShader(blur1dShader);
-  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -4 );
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-  glBindFBO(fbo1);
-  glBindShader(blur1dShader);
-  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -5 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(glareFbo);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  2, -4 );
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  4, -8 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   // Blur
@@ -1546,16 +1560,6 @@ function drawPostProcessing () {
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
   gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  -1, 1 );
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-  glBindFBO(fbo1);
-  glBindShader(blur1dShader);
-  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  1.5, 0 );
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-  glBindFBO(fbo2);
-  glBindShader(blur1dShader);
-  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  0, 1.5 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   // Persistence
@@ -1680,12 +1684,12 @@ if (DEBUG) {
   });
 
 
-  /*
+/*
   setInterval(function () {
     createInc();
     if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
     incomingObjects.splice(0, 1);
   }, 1000);
-  */
+*/
 
 }
