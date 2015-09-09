@@ -92,6 +92,7 @@ var Alost = audio([0,0.11,0.37,,0.92,0.15,,-0.06,-0.04,0.29,0.14,0.1,,0.5047,,,,
 var Acoin = audio([0,,0.0941,0.29,0.42,0.563,,,,,,0.4399,0.5658,,,,,,1,,,,,0.5]);
 var Amsg = audio([2,0.07,0.1,,0.2,0.75,0.35,-0.1,0.12,,,-0.02,,,,,-0.06,-0.0377,0.26,,,0.8,,0.7]);
 var Aufo = audio([2,0.05,0.8,,0.05,0.5,,,,0.46,0.29,,,,,,,,1,,,,,0.5]);
+var Alife = audio([0,0.12,0.8,0.48,0.77,0.92,,-0.12,-0.0999,,,-0.4,0.2,0.3396,,0.65,,,0.93,-0.02,,,,0.38]);
 
 // set up WebGL layer
 
@@ -131,9 +132,6 @@ var fbo2 = glCreateFBO();
 var textureGame = glCreateTexture();
 
 
-if (!localStorage.ba_ach) localStorage.ba_ach = [0,0,0];
-
-
 /// GAME STATE
 
 var t = 0, dt,
@@ -148,8 +146,8 @@ var t = 0, dt,
   dying = 0,
   resurrectionTime = 0,
   best = 0,
-  score = 0,
-  scoreForLife = 0,
+  score = 0, // current asteroids player score
+  scoreForLife, // will track the next score to win a life (10000, 20000, ...)
   playingSince = -10000,
   deads = 0,
   player = 0,
@@ -158,16 +156,19 @@ var t = 0, dt,
   AIshoot = 0, AIboost = 0, AIrotate = 0, AIexcitement = 0,
   AIboostSmoothed = 0,
 
+  musicPhase = 0,
+  musicTick = 0,
+  musicPaused = 0,
+  ufoMusicTime = 0,
+
   excitementSmoothed = 0,
   neverPlayed = 1,
   neverUFOs = 1,
   combos = 0,
+  gameOver,
   awaitingContinue = localStorage.ba_pl && parseInt(localStorage.ba_pl),
-  // achievements: nbAsteroids, nbKills, nbUfos
-  achievements =
-    localStorage.ba_ach.split(",").map(function (v) {
-      return parseInt(v, 10);
-    });
+  // achievements: [nbAsteroids, nbKills, nbUfos]
+  achievements;
 
 randomAsteroids();
 
@@ -253,19 +254,24 @@ function randomInGameAsteroid () {
 }
 */
 
+var nextCreate = 0;
 function maybeCreateInc () {
   var sum = incomingObjects.reduce(function (sum, o) {
     return o[6];
   }, 0);
   // create inc is ruled with probabilities
-  if (Math.random() <
+  if (
+    nextCreate < t &&
+    Math.random() <
     0.01 * dt * // continous time probability
     Math.exp(-sum * // more there is object, more it is rare to create new ones
     (1 + 5 * Math.exp(-(player-1)/3) - 0.2 * Math.exp(-Math.abs(player-20)/20)) // first rounds have less items
     ) *
     (1 - Math.exp(-playingSince / 5000))
-  )
+  ) {
+    nextCreate = t + 1000 * (1 + Math.random());
     return createInc();
+  }
 }
 
 function createInc () {
@@ -304,7 +310,7 @@ function createInc () {
   var ampRotRatio =
     player > 2 &&
     ampRot > Math.exp(-player/4) &&
-    Math.random() > 0.5 + 0.5 * ((player-3)%8)/8 - 0.4 * Math.exp(-player/10) ?
+    Math.random() > 0.5 + 0.4 * ((player-3)%8)/8 - 0.5 * (1 - Math.exp(-player/10)) ?
     0.9  - 0.5 * pRotAmpRatio - 0.2 * pRotAmp :
     1;
 
@@ -462,7 +468,6 @@ function spaceshipDie() {
   dying = t;
   deads ++;
   achievements[1] ++;
-  localStorage.ba_ach = achievements;
 }
 
 function dist (a, b) { // REMOVE and replace by length?
@@ -642,11 +647,6 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
   }
 }
 
-var musicPhase = 0;
-var musicTick = 0;
-var musicPaused = 0;
-var ufoMusicTime = 0;
-
 function update () {
   playingSince += dt;
 
@@ -656,21 +656,51 @@ function update () {
       play(Aufo);
   }
 
-  if (awaitingContinue) {
+  if (gameOver) {
+    // TODO actions: restart / tweet my score
+
+    if (tap && 280 < tap[1] && tap[1] < 400) {
+
+      if (W/2 - 180 < tap[0] && tap[0] < W/2 - 20) {
+        open("https://twitter.com/intent/tweet?hashtags=behindasteroids&via=greweb&url="+
+        encodeURIComponent(location.href)+
+        "&text="+
+        encodeURIComponent(
+          "Reached Level "+player+
+          " ("+(player*25)+"¢) with "+
+          achievements[0]+"⬠ "+
+          achievements[1]+"ᐃ "+
+          achievements[2]+"🝞"
+        ));
+      }
+      else if (W/2 + 20 < tap[0] && tap[0] < W/2 + 180) {
+        location.reload();
+      }
+    }
+
+    tap = 0;
+  }
+  else if (awaitingContinue) {
     if (playingSince>0 && tap && 140<tap[1] && tap[1]<280) {
       // continue game action
       if (tap[0]<W/2) { // YES
         player = awaitingContinue-1;
         playingSince = awaitingContinue = 0;
+        achievements = localStorage.ba_ach.split(",").map(function (v) {
+          return parseInt(v, 10);
+        });
       }
       else { // NO
         playingSince = awaitingContinue = 0;
-        localStorage.ba_pl = "";
       }
     }
     tap = 0;
   }
   else {
+
+    if (playingSince > 0 && !achievements) {
+      achievements = [0,0,0];
+    }
 
     var i;
     var nbSpaceshipBullets = 0;
@@ -690,7 +720,6 @@ function update () {
           0
         ]);
         achievements[2] ++;
-        localStorage.ba_ach = achievements;
       }
 
       musicPhase += musicFreq*2*Math.PI*dt/1000;
@@ -714,11 +743,14 @@ function update () {
       lifes = 4;
       player++;
       score = 0;
-      scoreForLife = 0;
+      scoreForLife = 10000;
       asteroids = [];
       ufos = [];
       play(Acoin);
-      if (player > 1) localStorage.ba_pl = player;
+      if (player > 1) {
+        localStorage.ba_pl = player;
+        localStorage.ba_ach = achievements;
+      }
     }
 
     // inc lifecycle
@@ -734,11 +766,12 @@ function update () {
             neverPlayed = tap = keys[o[7]] = 0;
             if (sendAsteroid(o)) {
               achievements[0] ++;
-              localStorage.ba_ach = achievements;
               if (player > 3) combos ++;
               incomingObjects.splice(i--, 1);
             }
             else {
+              // failed to aim (red aiming)
+              score += 1000;
               combos = 0;
               o[10] = t;
             }
@@ -808,10 +841,16 @@ function update () {
           explodeAsteroid(j);
           var s = 20 * Math.floor(0.4 * (6 - lvl) * (6 - lvl));
           score += s;
-          scoreForLife += s;
-          if (scoreForLife > 10000) {
+          if (score >= scoreForLife) {
             lifes ++;
-            scoreForLife = 0;
+            scoreForLife += 10000;
+            play(Alife);
+            if (lifes > 5) {
+              gameOver = 1;
+              incomingObjects = [];
+              ufos = [];
+              randomAsteroids();
+            }
           }
           best = Math.max(best, score);
           return;
@@ -877,7 +916,7 @@ function update () {
 
   particles.forEach(applyLife);
   loopOutOfBox(spaceship);
-  asteroids.forEach(playingSince > 0 && !awaitingContinue ? destroyOutOfBox : loopOutOfBox);
+  asteroids.forEach(playingSince > 0 && !awaitingContinue && !gameOver ? destroyOutOfBox : loopOutOfBox);
   ufos.forEach(loopOutOfBox);
   bullets.forEach(applyLife);
   bullets.forEach(loopOutOfBox);
@@ -1069,22 +1108,66 @@ function drawParticle () {
   ctx.arc(0, 0, 1, 0, 2*Math.PI);
   ctx.fill();
 }
+
+function button (t1, t2) {
+  ctx.globalAlpha = 1;
+  path([
+    [0, 0],
+    [160, 0],
+    [160, 120],
+    [0, 120]
+  ]);
+  ctx.translate(80, 30);
+  ctx.stroke();
+  ctx.fillStyle = "#000";
+  ctx.fill();
+  ctx.save();
+  font(t1, 2);
+  ctx.restore();
+  ctx.save();
+  ctx.translate(0, 40);
+  font(t2, 2);
+  ctx.restore();
+}
+
 function drawGameUI () {
   ctx.save();
   ctx.fillStyle = ctx.strokeStyle = "#0f0";
   ctx.globalAlpha = 0.3;
 
-  ctx.save();
-  ctx.translate(W/2, 20);
-  font(scoreTxt(best), .6);
-  ctx.restore();
+  if (gameOver) {
+    ctx.save();
+    ctx.strokeStyle = "#0f0";
+    ctx.globalAlpha = 0.3;
+    ctx.save();
+    ctx.translate((W-260)/2, 60);
+    font("YOU WON ", 2, 1);
+    ctx.globalAlpha = 0.5;
+    font((player*25)+"¢", 2, 1);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(W/2, 130);
+    font("FROM "+player+" PLAYERS", 2);
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.translate((W-200)/2, 230);
+    drawAchievements(2);
+    ctx.restore();
 
-  ctx.save();
-  ctx.translate(50, 20);
-  font(scoreTxt(score), 1.5, 1);
-  ctx.restore();
+    ctx.save();
+    ctx.translate(W/2 - 180, 280);
+    button("TWEET", "SCORE");
+    ctx.restore();
 
-  if (playingSince < 0 || awaitingContinue) {
+    ctx.save();
+    ctx.translate(W/2 + 20, 280);
+    button("PLAY", "AGAIN");
+    ctx.restore();
+
+    ctx.restore();
+  }
+  else if (playingSince < 0 || awaitingContinue) {
     ctx.save();
     ctx.translate(W-50, 20);
     font(scoreTxt(0), 1.5, -1);
@@ -1124,14 +1207,14 @@ function drawGameUI () {
       ctx.restore();
     }
   }
-  if (dying && lifes==1) {
+  if (!gameOver && dying && lifes==1) {
     ctx.save();
     ctx.lineWidth = 2;
     ctx.translate(W/2, 140);
     font("GAME OVER", 2);
     ctx.restore();
   }
-  if (awaitingContinue && playingSince > 0) {
+  if (!gameOver && awaitingContinue && playingSince > 0) {
     ctx.save();
     ctx.translate(W/2, 100);
     font("CONTINUE GAME ?", 2);
@@ -1152,7 +1235,19 @@ function drawGameUI () {
   font("2015 GREWEB INC", .6);
   ctx.restore();
 
-  if (playingSince<0 && t%1000<800) {
+  if (!gameOver) {
+    ctx.save();
+    ctx.translate(W/2, 20);
+    font(scoreTxt(best), .6);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(50, 20);
+    font(scoreTxt(score), 1.5, 1);
+    ctx.restore();
+  }
+
+  if (gameOver || playingSince<0 && t%1000<800) {
     ctx.save();
     ctx.translate(W-20, H-24);
     font(MOBILE ? "MOBILE" : "DESKTOP", .6, -1);
@@ -1199,7 +1294,7 @@ function drawGame () {
   renderCollection(bullets, drawBullet);
   renderCollection(particles, drawParticle);
 
-  if (playingSince > 0 && !awaitingContinue) {
+  if (playingSince > 0 && !awaitingContinue && !gameOver) {
     ctx.save();
     translateTo(spaceship);
     drawSpaceship(spaceship);
@@ -1350,7 +1445,11 @@ function drawUI () {
     ][Math.floor(Math.exp((-player)/8)*6)];
   }
 
-  if (!player) {
+  if (gameOver) {
+    currentMessage = "GAME OVER";
+    currentMessage2 = "PLAYER REACHED ᐃᐃᐃᐃᐃ";
+  }
+  else if (!player) {
     if (playingSince<-7000) {
       currentMessage = "BEHIND ASTEROIDS";
       currentMessage2 = "THE DARK SIDE";
@@ -1415,6 +1514,16 @@ function drawUI () {
             currentMessage2 = "TO SEND THEM TO THE GAME";
           }
         }
+        else if (lifes > 4 && score % 10000 > 800) {
+          currentMessageClr = currentMessageClr2 = "#f66";
+          currentMessage = "DON'T LET PLAYER";
+          currentMessage2 = "REACH ᐃᐃᐃᐃᐃ !!!";
+        }
+        else if (score > 10000 && score % 10000 < 800) {
+          currentMessageClr = currentMessageClr2 = "#f66";
+          currentMessage = "OH NO! PLAYER JUST";
+          currentMessage2 = "WON AN EXTRA LIFE!";
+        }
         else if (player==2 && 5000<playingSince) {
           currentMessageClr2 = currentMessageClr = "#7cf";
           currentMessage = "LETS TRAIN WITH...";
@@ -1455,13 +1564,6 @@ function drawUI () {
   }
 
   ctx.save();
-  ctx.translate(FW - GAME_MARGIN, 2);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "#7cf";
-  font(((playingSince>0&&awaitingContinue||player)*25)+"¢", 2, -1);
-  ctx.restore();
-
-  ctx.save();
   ctx.translate(GAME_MARGIN, MOBILE ? 40 : 2);
   ctx.lineWidth = (t%600>300) ? 2 : 1;
   ctx.save();
@@ -1475,22 +1577,40 @@ function drawUI () {
   ctx.restore();
   ctx.restore();
 
+  if (gameOver) return;
+
+  ctx.save();
+  ctx.translate(FW - GAME_MARGIN, 2);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#7cf";
+  font(((playingSince>0&&awaitingContinue||player)*25)+"¢", 2, -1);
+  ctx.restore();
+
   ctx.save();
   ctx.strokeStyle = "#7cf";
   ctx.translate(FW - GAME_MARGIN, FH - 20);
   if (combos) font(combos+"x", 1.5, -1);
   ctx.restore();
 
+  if (achievements) {
+    ctx.save();
+    ctx.translate(GAME_MARGIN + 50, FH - 20);
+    ctx.strokeStyle = "#fc7";
+    drawAchievements(1);
+    ctx.restore();
+  }
+}
+
+function drawAchievements (fontSize) {
   for (var j = 0; j < 3; j++) {
     var badge = achievements[j];
     if (badge) {
       ctx.save();
-      ctx.strokeStyle = "#fc7";
-      ctx.translate(GAME_MARGIN + 50 + 100 * j, FH - 20);
+      ctx.translate(100 * j, 0);
       path(badgesIcons[j]);
       ctx.stroke();
-      ctx.translate(0, -30);
-      font(""+badge, 1);
+      ctx.translate(0, -20 - 10 * fontSize);
+      font(""+badge, fontSize);
       ctx.restore();
     }
   }
@@ -1511,7 +1631,7 @@ function drawPostProcessing () {
   glBindShader(playerShader);
   gl.uniform1f(glUniformLocation(playerShader, "pt"), playingSince / 1000);
   gl.uniform1f(glUniformLocation(playerShader, "pl"), player);
-  gl.uniform1f(glUniformLocation(playerShader, "ex"), excitementSmoothed);
+  gl.uniform1f(glUniformLocation(playerShader, "ex"), gameOver || excitementSmoothed);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
@@ -1554,12 +1674,22 @@ function drawPostProcessing () {
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(laserFbo), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  1, 1 );
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  0.5, 0.5 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo2);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
-  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  -1, 1 );
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  -0.5, 0.5 );
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  glBindFBO(fbo1);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo2), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  1, 0 );
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  glBindFBO(fbo2);
+  glBindShader(blur1dShader);
+  gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(fbo1), 0));
+  gl.uniform2f(glUniformLocation(blur1dShader, "dir"),  0, 1 );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   // Persistence
@@ -1663,10 +1793,7 @@ requestAnimationFrame(render);
 
 if (DEBUG) {
 
-
-  //playingSince=-1;
-
-  addEventListener("dblclick", function () {
+  addEventListener("resize", function () {
     playingSince = -1;
     player += 1;
     incomingObjects = [];
