@@ -211,7 +211,7 @@ function sendAsteroid (o) {
     var rot = incRotation(o);
     var x = Math.max(0, Math.min(p[0], W));
     var y = Math.max(0, Math.min(p[1], H));
-    var vel = 0.005 * o[3] * (0.5 + 0.5 * Math.random());
+    var vel = 0.007 * o[3];
     var lvl = o[6];
     var shape = o[5];
     asteroids.push([ x, y, rot, vel, shape, lvl ]);
@@ -330,7 +330,7 @@ function createInc () {
     // initial angle
     2*Math.PI*Math.random(),
     // initial force
-    30*Math.random(),
+    10 + 40*Math.random(),
     // rot velocity
     0.002 + 0.001 * (Math.random() + 0.5 * lvl * Math.random()) * pRotSpeed - 0.001 * pRotAmp,
     // shape
@@ -348,6 +348,14 @@ function createInc () {
     0
   ]);
   return 1;
+}
+
+function applyIncLogic (o) {
+  if (!o[10]) {
+    o[0] += 0.1 * dt;
+    o[2] += o[4] * dt;
+    o[3] = o[3] < 10 ? 60 : o[3] - 0.02 * dt;
+  }
 }
 
 function randomAsteroidShape (lvl) {
@@ -486,14 +494,6 @@ function resetSpaceship () {
   spaceship = [x, y, 0, 0];
 }
 */
-
-function applyIncLogic (o) {
-  if (!o[10]) {
-    o[0] += 0.1 * dt;
-    o[2] += o[4] * dt;
-    o[3] = o[3] < 10 ? 60 : o[3] * (1 - 0.0008 * dt);
-  }
-}
 
 function applyUFOlogic (o) {
   o[4] -= dt;
@@ -879,7 +879,7 @@ function update () {
       var ax = Math.cos(spaceship[4]);
       var ay = Math.sin(spaceship[4]);
 
-      var quality = 0.4 +
+      var quality = 0.2 +
         1-Math.exp((1-player)/4) +
         1-Math.exp((1-player)/8);
       var rep = Math.random();
@@ -1140,8 +1140,8 @@ function drawGameUI () {
     ctx.strokeStyle = "#0f0";
     ctx.globalAlpha = 0.3;
     ctx.save();
-    ctx.translate((W-260)/2, 60);
-    font("YOU WON ", 2, 1);
+    ctx.translate((W-340)/2, 60);
+    font("YOU EARNED ", 2, 1);
     ctx.globalAlpha = 0.5;
     font((player*25)+"¢", 2, 1);
     ctx.restore();
@@ -1446,8 +1446,8 @@ function drawUI () {
   }
 
   if (gameOver) {
-    currentMessage = "GAME OVER";
-    currentMessage2 = "PLAYER REACHED ᐃᐃᐃᐃᐃ";
+    currentMessage = "PLAYER MASTERED THE GAME";
+    currentMessage2 = "REACHED ᐃᐃᐃᐃᐃ";
   }
   else if (!player) {
     if (playingSince<-7000) {
@@ -1475,7 +1475,7 @@ function drawUI () {
     if (lifes==1) {
       currentMessageClr2 = "#f66";
       currentMessage = "GOOD JOB !!!";
-      currentMessage2 = "THE DUDE IS TIRED";
+      currentMessage2 = "THE DUDE IS BROKE";
     }
     else if (lifes==2) {
       currentMessageClr2 = "#f66";
@@ -1799,11 +1799,11 @@ if (DEBUG) {
     incomingObjects = [];
     console.log("player=", player);
 
-
+/*
     player = 42;
     achievements = [123, 45, 6];
     gameOver = 1;
-    /*
+
     var a = 2 * Math.PI * Math.random();
     ufos.push([
       W * Math.random(),
@@ -1812,7 +1812,8 @@ if (DEBUG) {
       0.1 * Math.sin(a),
       0
     ]);
-    */
+*/
+
   });
 
 
