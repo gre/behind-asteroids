@@ -450,13 +450,15 @@ function SfxrSynth() {
 // Adapted from http://codebase.es/riffwave/
 var synth = new SfxrSynth();
 // Export for the Closure Compiler
-jsfxr = function(settings) {
+jsfxr = function(settings, audioCtx, cb) {
   // Initialize SfxrParams
   synth._params.setSettings(settings);
   // Synthesize Wave
   var envelopeFullLength = synth.totalReset();
   var data = new Uint8Array(((envelopeFullLength + 1) / 2 | 0) * 4 + 44);
+
   var used = synth.synthWave(new Uint16Array(data.buffer, 44), envelopeFullLength) * 2;
+
   var dv = new Uint32Array(data.buffer, 0, 44);
   // Initialize header
   dv[0] = 0x46464952; // "RIFF"
@@ -481,5 +483,8 @@ jsfxr = function(settings) {
     var a = data[i] << 16 | data[i + 1] << 8 | data[i + 2];
     output += base64Characters[a >> 18] + base64Characters[a >> 12 & 63] + base64Characters[a >> 6 & 63] + base64Characters[a & 63];
   }
+
+  audioCtx && audioCtx.decodeAudioData(data.buffer, cb);
+
   return output;
 }

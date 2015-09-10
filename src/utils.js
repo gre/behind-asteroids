@@ -13,3 +13,13 @@ function smoothstep (min, max, value) { // eslint-disable-line no-unused-vars
 function scoreTxt (s) { // eslint-disable-line no-unused-vars
   return (s<=9?"0":"")+s;
 }
+
+function dist (a, b) { // eslint-disable-line no-unused-vars
+  var x = a[0]-b[0];
+  var y = a[1]-b[1];
+  return Math.sqrt(x * x + y * y);
+}
+
+function length (v) { // eslint-disable-line no-unused-vars
+  return Math.sqrt(v[0]*v[0]+v[1]*v[1]);
+}
