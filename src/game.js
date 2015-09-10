@@ -37,6 +37,7 @@ dist
 
 /* TODO list
 - improve the AI
+  - stabilize
 */
 
 var gl = c.getContext("webgl") || c.getContext("experimental-webgl"),
@@ -366,7 +367,7 @@ function createInc () {
   var pRotSpeed = diffMin + Math.random() * (diffMax-diffMin);
 
   var lvl = Math.floor(2 + 3 * Math.random() * Math.random() + 4 * Math.random() * Math.random() * Math.random());
-  var ampRot = player<2 ? 0 : Math.PI * (0.8 * Math.random() * pRotAmp + 0.1 * lvl) * pRotAmp;
+  var ampRot = player<2 ? 0 : Math.PI * (0.8 * Math.random() + 0.05 * lvl) * pRotAmp;
   if (ampRot < 0.2) ampRot = 0;
   var ampRotRatio =
     player > 2 &&
@@ -564,6 +565,8 @@ function applyUFOlogic (o) {
   }
 }
 
+var closestAsteroidMemory, targetAsteroidMemory, closestAsteroidMemoryT, targetAsteroidMemoryT;
+
 // AI states
 // q1 and q2 are 2 quality expertise of the player
 function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
@@ -593,6 +596,17 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
   var danger = 0;
   var closestAsteroid, closestAsteroidPredDist;
   var targetAsteroid, targetAsteroidWeight;
+
+  if (closestAsteroidMemory &&
+    asteroids.indexOf(closestAsteroidMemory)!=-1 &&
+    t - closestAsteroidMemoryT < 80 * Math.random()) {
+    closestAsteroid = closestAsteroidMemory;
+  }
+  if (targetAsteroidMemory &&
+    asteroids.indexOf(targetAsteroidMemory)!=-1 &&
+    t - targetAsteroidMemoryT < 80 * Math.random()) {
+    targetAsteroid = targetAsteroidMemory;
+  }
 
   for (i = 0; i < asteroids.length; ++i) {
     var a = asteroids[i];
@@ -675,8 +689,12 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
     }
   }
 
+  if (Math.random()<0.1 && vel < 0.1) {
+  // minimal move
+    AIboost = 1;
+  }
   // Slowing down
-  if (
+  else if (
     -Math.exp(-distMiddle/80) + // slow down if middle
     Math.exp(-vel) + // slow down if velocity
     (1-2*q1) * AIexcitement * Math.random() // excitement make it not slowing down
@@ -688,6 +706,8 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
     x = closestAsteroid[0]-spaceship[0];
     y = closestAsteroid[1]-spaceship[1];
     AIboost = opp(x, y);
+    closestAsteroidMemory = closestAsteroid;
+    closestAsteroidMemoryT = t;
   }
 
   if (targetAsteroid && q2>Math.random()-0.01*dt) {
@@ -697,6 +717,8 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
     var angabs = Math.abs(ang);
     if (Math.random() < 0.06*dt*angabs) AIrotate = ang > 0 ? 1 : -1;
     AIshoot = Math.random() < 0.005 * dt * (Math.exp(-angabs*10) + AIexcitement + q1);
+    targetAsteroidMemory = targetAsteroid;
+    targetAsteroidMemoryT = t;
   }
 }
 
@@ -773,7 +795,7 @@ function update () {
         var o = incomingObjects[i];
         if (!o[10]) {
           var p = incPosition(o);
-          var matchingTap = tap && circleCollides(tap, p, 40 + 10 * o[6]);
+          var matchingTap = tap && circleCollides(tap, p, (MOBILE ? 60 : 20) + 10 * o[6]);
           if (keys[o[7]] || matchingTap) {
             // send an asteroid
             neverPlayed = tap = keys[o[7]] = 0;
