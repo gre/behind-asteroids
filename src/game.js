@@ -584,7 +584,7 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
   var distMiddle = length(deltaMiddle);
   var angMiddle = Math.atan2(deltaMiddle[1], deltaMiddle[0]);
 
-  var pred = 100 + 500 * Math.random();
+  var pred = 100 + (500 + 500 * q1) * Math.random();
   var predSpaceship = [
     spaceship[0] + pred * spaceship[2],
     spaceship[1] + pred * spaceship[3]
@@ -895,7 +895,7 @@ function update () {
       var ax = Math.cos(spaceship[4]);
       var ay = Math.sin(spaceship[4]);
 
-      var quality = 0.1 +
+      var quality = Math.min(0.5, player/8) +
         1-Math.exp((1-player)/4) +
         1-Math.exp((1-player)/8);
       var rep = Math.random();
@@ -1744,8 +1744,11 @@ function drawPostProcessing () {
   gl.uniform1i(glUniformLocation(gameShader, "B"), glBindTexture(glGetFBOTexture(fbo2), 2));
   gl.uniform1i(glUniformLocation(gameShader, "L"), glBindTexture(glGetFBOTexture(glareFbo), 3));
   gl.uniform1i(glUniformLocation(gameShader, "E"), glBindTexture(glGetFBOTexture(playerFbo), 4));
-  gl.uniform1f(glUniformLocation(gameShader, "s"), !player ? smoothstep(-4000, -3000, playingSince) : 1);
-  gl.uniform1f(glUniformLocation(gameShader, "F"), smoothstep(300, 0, t-lastLoseShot) + lifes>4 ? 0.5*smoothstep(-1, 1, Math.cos(0.01*t)) : 0);
+  gl.uniform1f(glUniformLocation(gameShader, "s"),
+    !player ? smoothstep(-4000, -3000, playingSince) : 1);
+  gl.uniform1f(glUniformLocation(gameShader, "F"),
+    smoothstep(300, 0, t-lastLoseShot) +
+    lifes>4 ? 0.5 * smoothstep(-1, 1, Math.cos(0.01*t)) : 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
