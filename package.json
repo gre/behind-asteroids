@@ -4,7 +4,7 @@
   "description": "",
   "scripts": {
     "clean": "rm -rf build/; mkdir -p build target",
-    "compileglsl": "./scripts/compileglslfiles.sh src build",
+    "compileglsl": "./scripts/compileglslfiles.sh src/shaders build",
     "concat": "./scripts/concat.sh > build/build.js",
     "minify": "uglifyjs build/build.js -c --screw-ie8 -m -o build/build.min.js",
     "nominify": "cp build/build.js build/build.min.js",

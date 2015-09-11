@@ -16,9 +16,7 @@ if [ ! -d "$2" ]; then
   exit 4;
 fi;
 
-
-cd $1;
-for glsl in *.frag *.vert; do
-  cat $glsl | glslmin > ../$2/$glsl;
+for glsl in $1/*.frag $1/*.vert; do
+  name=`basename $glsl`;
+  cat $glsl | glslmin > $2/$name;
 done;
-cd ..;
