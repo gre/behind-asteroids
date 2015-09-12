@@ -239,7 +239,6 @@ function update () {
 
     // score lifecycle
 
-    best = Math.max(best, score);
     if (score >= scoreForLife) {
       lastExtraLife = t;
       lifes ++;
@@ -252,6 +251,12 @@ function update () {
         randomAsteroids();
       }
     }
+
+    if (!dying && playingSince>0 && t - lastScoreIncrement > 100) {
+      score += 10;
+      lastScoreIncrement = t;
+    }
+    best = Math.max(best, score);
 
     // collision
 
@@ -288,7 +293,7 @@ function update () {
           explose(bull);
           bullets.splice(i, 1);
           explodeAsteroid(j);
-          score += 20 * Math.floor(0.4 * (6 - lvl) * (6 - lvl));
+          score += 50 * Math.floor(0.4 * (6 - lvl) * (6 - lvl));
           return;
         }
       }
@@ -381,8 +386,8 @@ function update () {
 
   var shake = jumpingAmp * Math.pow(smoothstep(0.2, 0.0, jumping), 0.5);
   shaking = [
-    40 * shake * (Math.random()-0.5) / FW,
-    40 * shake * (Math.random()-0.5) / FH
+    30 * shake * (Math.random()-0.5) / FW,
+    30 * shake * (Math.random()-0.5) / FH
   ];
 }
 

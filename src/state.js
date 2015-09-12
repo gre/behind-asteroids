@@ -48,6 +48,7 @@ var t = 0, dt,
   // achievements: [nbAsteroids, nbKills, nbUfos]
   achievements,
 
+  lastScoreIncrement = -9999,
   lastBulletShoot = -9999,
   lastExtraLife = -9999,
   lastLoseShot = -9999,

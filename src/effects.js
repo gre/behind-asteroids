@@ -49,7 +49,7 @@ function drawPostProcessing () {
   gl.uniform1f(glUniformLocation(playerShader, "pl"), player);
   gl.uniform1f(glUniformLocation(playerShader, "ex"), gameOver || excitementSmoothed);
   gl.uniform1f(glUniformLocation(playerShader, "J"), jumping);
-  gl.uniform1f(glUniformLocation(playerShader, "P"), gameOver || dying ? 0 : 1);
+  gl.uniform1f(glUniformLocation(playerShader, "P"), playingSince<0 || gameOver || dying ? 0 : 1);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
