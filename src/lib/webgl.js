@@ -1,6 +1,6 @@
 /* global gl, W, H, DEBUG */
 
-function glCreateShader (vert, frag) { // eslint-disable-line no-unused-vars
+function glCreateShader (vert, frag) {
   var handle, type = gl.VERTEX_SHADER, src = vert;
   handle = gl.createShader(type);
   gl.shaderSource(handle, src);
@@ -40,13 +40,13 @@ function glCreateShader (vert, frag) { // eslint-disable-line no-unused-vars
   gl.vertexAttribPointer(p, 2, gl.FLOAT, false, 0, 0);
   return [program];
 }
-function glBindShader (shader) { // eslint-disable-line no-unused-vars
+function glBindShader (shader) {
   gl.useProgram(shader[0]);
 }
-function glUniformLocation(shader, name) { // eslint-disable-line no-unused-vars
+function glUniformLocation(shader, name) {
   return shader[name] || (shader[name] = gl.getUniformLocation(shader[0], name));
 }
-function glCreateTexture () { // eslint-disable-line no-unused-vars
+function glCreateTexture () {
   var tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -55,16 +55,16 @@ function glCreateTexture () { // eslint-disable-line no-unused-vars
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   return tex;
 }
-function glSetTexture (t, value) { // eslint-disable-line no-unused-vars
+function glSetTexture (t, value) {
   gl.bindTexture(gl.TEXTURE_2D, t);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, value);
 }
-function glBindTexture (t, unit) { // eslint-disable-line no-unused-vars
+function glBindTexture (t, unit) {
   gl.activeTexture(gl.TEXTURE0 + unit);
   gl.bindTexture(gl.TEXTURE_2D, t);
   return unit;
 }
-function glCreateFBO () { // eslint-disable-line no-unused-vars
+function glCreateFBO () {
   var handle = gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, handle);
   var color = glCreateTexture();
@@ -72,9 +72,9 @@ function glCreateFBO () { // eslint-disable-line no-unused-vars
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, color, 0);
   return [handle, color];
 }
-function glBindFBO (fbo) { // eslint-disable-line no-unused-vars
+function glBindFBO (fbo) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[0]);
 }
-function glGetFBOTexture (fbo) { // eslint-disable-line no-unused-vars
+function glGetFBOTexture (fbo) {
   return fbo[1];
 }

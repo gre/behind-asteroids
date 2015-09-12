@@ -1,5 +1,6 @@
 {
   "rules": {
+    "no-unused-vars": 0,
     "no-sparse-arrays": 0,
     "indent": [
       2,
