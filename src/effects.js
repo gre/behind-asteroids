@@ -133,7 +133,7 @@ function drawPostProcessing () {
     !player ? smoothstep(-4000, -3000, playingSince) : 1);
   gl.uniform1f(glUniformLocation(gameShader, "F"),
     smoothstep(300, 0, t-lastLoseShot) +
-    lifes>4 ? 0.5 * smoothstep(-1, 1, Math.cos(0.01*t)) : 0);
+    !gameOver && lifes>4 ? 0.5 * smoothstep(-1, 1, Math.cos(0.01*t)) : 0);
   gl.uniform2f(glUniformLocation(gameShader, "k"), shaking[0], shaking[1]);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }

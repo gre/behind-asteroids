@@ -233,7 +233,7 @@ function update () {
         playingSince = -5000;
         randomAsteroids();
         ufos = [];
-        play(Alost);
+        setTimeout(function(){ play(Aleave); }, 1000);
       }
     }
 
@@ -249,6 +249,7 @@ function update () {
         incomingObjects = [];
         ufos = [];
         randomAsteroids();
+        delete localStorage.ba_pl;
       }
     }
 
@@ -385,6 +386,10 @@ function update () {
   }
 
   var shake = jumpingAmp * Math.pow(smoothstep(0.2, 0.0, jumping), 0.5);
+  if (shake > 0.5 && t-lastJump>100) {
+    play(Ajump);
+    lastJump = t;
+  }
   shaking = [
     30 * shake * (Math.random()-0.5) / FW,
     30 * shake * (Math.random()-0.5) / FH

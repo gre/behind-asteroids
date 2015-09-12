@@ -1,10 +1,13 @@
 /* global
-ctx t path AIboostSmoothed dying:true deads:true achievements killSmoothed:true
+ctx t path lifes play Alost AIboostSmoothed dying:true deads:true achievements killSmoothed:true
 */
 
 function spaceshipDie() {
   if (dying) return;
   dying = t;
+  if (lifes == 1) {
+    play(Alost);
+  }
   deads ++;
   achievements[1] ++;
   killSmoothed ++;
