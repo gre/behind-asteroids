@@ -1,5 +1,5 @@
 /* global
-ctx t path AIboostSmoothed dying:true deads:true achievements
+ctx t path AIboostSmoothed dying:true deads:true achievements killSmoothed:true
 */
 
 function spaceshipDie() {
@@ -7,6 +7,7 @@ function spaceshipDie() {
   dying = t;
   deads ++;
   achievements[1] ++;
+  killSmoothed ++;
 }
 
 /*

@@ -20,7 +20,7 @@ if (DEBUG) {
   addEventListener("resize", function () {
     playingSince = -1;
     awaitingContinue = 0;
-    player += 2;
+    player ++;
     incomingObjects = [];
     console.log("player=", player);
 /*
@@ -30,6 +30,15 @@ if (DEBUG) {
     */
 
   });
+
+/*
+  setTimeout(function () {
+    killSmoothed ++;
+  }, 100);
+  setTimeout(function () {
+    killSmoothed ++;
+  }, 2000);
+  */
 
   // Debug the incomingObjects
 
@@ -166,6 +175,8 @@ function update () {
       player++;
       score = 0;
       scoreForLife = 10000;
+      jumpingAmp = 0;
+      jumpingFreq = 0;
       asteroids = [];
       ufos = [];
       play(Acoin);
@@ -286,7 +297,7 @@ function update () {
     if (!dying && playingSince > 0) asteroids.forEach(function (aster, j) {
       // asteroid-spaceship collision
       if (circleCollides(aster, spaceship, 10 + 10 * aster[5])) {
-        if (t - resurrectionTime < 1000) {
+        if (t - resurrectionTime < 200) {
           // if spaceship just resurect, will explode the asteroid
           explodeAsteroid(j);
         }
@@ -344,6 +355,35 @@ function update () {
 
   excitementSmoothed += 0.04 * (AIexcitement - excitementSmoothed);
   AIboostSmoothed += 0.04 * (AIboost - AIboostSmoothed);
+
+  // handling jumping / shaking
+  killSmoothed -= dt * 0.0003 * killSmoothed;
+  jumpingAmpSmoothed += 0.04 * (jumpingAmp - jumpingAmpSmoothed);
+  jumpingFreqSmoothed += 0.04 * (jumpingFreq - jumpingFreqSmoothed);
+  if (killSmoothed > 1.3) {
+    if (jumpingAmp < 0.5) {
+      jumpingFreq = 1 + Math.random();
+      jumpingAmp ++;
+    }
+  }
+  if (killSmoothed < 0.8) {
+    jumpingAmp = 0;
+  }
+  var prevPhase = jumpingPhase;
+  jumpingPhase += jumpingFreq *2*Math.PI*dt/1000;
+  jumping = jumpingAmpSmoothed * Math.pow(Math.cos(jumpingPhase), 2.0);
+  if (Math.cos(prevPhase) < 0 && 0 < Math.cos(jumpingPhase)) {
+    jumpingFreq = 1 + 3 * Math.random() * Math.random();
+  }
+  if (jumpingAmp < 0.5) {
+    jumpingAmpSmoothed += 0.04 * (jumpingAmp - jumpingAmpSmoothed);
+  }
+
+  var shake = jumpingAmp * Math.pow(smoothstep(0.2, 0.0, jumping), 0.5);
+  shaking = [
+    40 * shake * (Math.random()-0.5) / FW,
+    40 * shake * (Math.random()-0.5) / FH
+  ];
 }
 
 

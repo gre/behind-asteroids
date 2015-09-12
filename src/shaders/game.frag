@@ -8,6 +8,7 @@ uniform sampler2D L; // glare
 uniform sampler2D E; // env (player)
 uniform float s; // starting
 uniform float F; // fail factor (red effect)
+uniform vec2 k;
 
 float squircleDist (vec2 a, vec2 b) {
   float p = 10.0;
@@ -16,14 +17,20 @@ float squircleDist (vec2 a, vec2 b) {
 }
 
 void main() {
-  vec2 pos = (uv/0.98)-0.01;
-  float d = squircleDist(uv, vec2(0.5));
+  vec2 UV = uv + k;
+  vec2 pos = (UV/0.98)-0.01;
+  float d = squircleDist(UV, vec2(0.5));
   float dd = smoothstep(0.45, 0.51, d);
   pos = mix(pos, vec2(0.5), 0.2 * (0.6 - d) - 0.02 * d);
 
   vec3 gc = texture2D(G, pos).rgb;
 
-  gl_FragColor = vec4((
+  gl_FragColor =
+  step(0.0, UV.x) *
+  step(UV.x, 1.0) *
+  step(0.0, UV.y) *
+  step(UV.y, 1.0) *
+  vec4((
     vec3(0.03 + 0.1 * F, 0.04, 0.05) +
     mix(vec3(0.05, 0.1, 0.15) - gc, 2.0 * gc, s) +
     s * (

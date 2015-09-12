@@ -28,6 +28,9 @@ player
 playingSince
 lifes
 lastLoseShot
+shaking
+jumping
+dying
 */
 
 function drawPostProcessing () {
@@ -45,6 +48,8 @@ function drawPostProcessing () {
   gl.uniform1f(glUniformLocation(playerShader, "pt"), playingSince / 1000);
   gl.uniform1f(glUniformLocation(playerShader, "pl"), player);
   gl.uniform1f(glUniformLocation(playerShader, "ex"), gameOver || excitementSmoothed);
+  gl.uniform1f(glUniformLocation(playerShader, "J"), jumping);
+  gl.uniform1f(glUniformLocation(playerShader, "P"), gameOver || dying ? 0 : 1);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
@@ -129,5 +134,6 @@ function drawPostProcessing () {
   gl.uniform1f(glUniformLocation(gameShader, "F"),
     smoothstep(300, 0, t-lastLoseShot) +
     lifes>4 ? 0.5 * smoothstep(-1, 1, Math.cos(0.01*t)) : 0);
+  gl.uniform2f(glUniformLocation(gameShader, "k"), shaking[0], shaking[1]);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
