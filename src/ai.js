@@ -1,4 +1,5 @@
 /* global
+DEBUG
 AIrotate: true
 AIboost: true
 AIshoot: true
@@ -6,97 +7,270 @@ AIexcitement: true
 spaceship
 t dt
 asteroids
+bullets
 W H
 dist normAngle
 ufos
 playingSince
+ctx
 */
 
-var closestAsteroidMemory, targetAsteroidMemory, closestAsteroidMemoryT, targetAsteroidMemoryT;
+/*
+if (DEBUG) {
+  /* eslint-disable no-inner-declarations
+  var AIdebug = [], AIdebugCircle = [];
+  function drawAIDebug () {
+    AIdebug.forEach(function (debug, i) {
+      ctx.save();
+      ctx.lineWidth = 2;
+      ctx.fillStyle = ctx.strokeStyle = "hsl("+Math.floor(360*i/AIdebug.length)+",80%,50%)";
+      ctx.beginPath();
+      ctx.moveTo(debug[0], debug[1]);
+      ctx.lineTo(debug[2], debug[3]);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(debug[0], debug[1], 2, 0, 2*Math.PI);
+      ctx.fill();
+      ctx.restore();
+    });
+    AIdebugCircle.forEach(function (debug, i) {
+      ctx.save();
+      ctx.lineWidth = 2;
+      ctx.fillStyle = ctx.strokeStyle = "hsl("+Math.floor(360*i/AIdebugCircle.length)+",80%,50%)";
+      ctx.beginPath();
+      ctx.arc(debug[0], debug[1], Math.max(0, debug[2] * debug[3]), 0, 2*Math.PI);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(debug[0], debug[1], debug[3], 0, 2*Math.PI);
+      ctx.stroke();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(debug[2].toFixed(2), debug[0], debug[1]-debug[3]-2);
+      ctx.restore();
+    });
+  }
+  function clearDebug () {
+    AIdebug = [];
+    AIdebugCircle = [];
+  }
+  function addDebugCircle (p, value, radius) {
+    AIdebugCircle.push([ p[0], p[1], value, radius ]);
+  }
+  function addDebug (p, v) {
+    var d = 200;
+    AIdebug.push([ p[0], p[1], p[0]+(v?d*v[0]:0), p[1]+(v?d*v[1]:0) ]);
+  }
+  function addPolarDebug (p, ang, vel) {
+    var v = [
+      vel * Math.cos(ang),
+      vel * Math.sin(ang)
+    ];
+    addDebug(p, v);
+  }
+  /* eslint-enable
+}
+*/
+
+var closestAsteroidMemory, targetShootMemory, closestAsteroidMemoryT, targetShootMemoryT;
 
 // AI states
-// q1 and q2 are 2 quality expertise of the player
-function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
-  var x, y, i, ang;
-  var prevRot = AIrotate;
-  var prevBoost = AIboost;
-  AIrotate = 0;
-  AIshoot = 0;
-  AIboost = 0;
+function aiLogic (smart) { // set the 3 AI inputs (rotate, shoot, boost)
+  var i;
+
+  // DEBUG && clearDebug();
 
   // first part is data extraction / analysis
 
-  var ax = Math.cos(spaceship[4]);
-  var ay = Math.sin(spaceship[4]);
+  //var ax = Math.cos(spaceship[4]);
+  //var ay = Math.sin(spaceship[4]);
   var vel = Math.sqrt(spaceship[2]*spaceship[2]+spaceship[3]*spaceship[3]);
+  var velAng = Math.atan2(spaceship[3], spaceship[2]);
 
-  var deltaMiddle = [W/2-spaceship[0], H/2-spaceship[1]];
-  var distMiddle = length(deltaMiddle);
-  var angMiddle = Math.atan2(deltaMiddle[1], deltaMiddle[0]);
+  //var spaceshipVel = [ ax * vel, ay * vel ];
 
-  var pred = 100 + (500 + 500 * q1) * Math.random();
-  var predSpaceship = [
-    spaceship[0] + pred * spaceship[2],
-    spaceship[1] + pred * spaceship[3]
-  ];
 
-  var danger = 0;
-  var closestAsteroid, closestAsteroidPredDist;
-  var targetAsteroid, targetAsteroidWeight;
+  // utilities
 
-  if (closestAsteroidMemory &&
-    asteroids.indexOf(closestAsteroidMemory)!=-1 &&
-    t - closestAsteroidMemoryT < 80 * Math.random()) {
-    closestAsteroid = closestAsteroidMemory;
+  function orient (ang) {
+    var stableAng = normAngle(ang - spaceship[4]);
+    AIrotate = stableAng < 0 ? -1 : 1;
+    return stableAng;
   }
-  if (targetAsteroidMemory &&
-    asteroids.indexOf(targetAsteroidMemory)!=-1 &&
-    t - targetAsteroidMemoryT < 80 * Math.random()) {
-    targetAsteroid = targetAsteroidMemory;
+
+  function move (ang, vel) {
+    var stableAng = normAngle(ang - spaceship[4]);
+    var abs = Math.abs(stableAng);
+    if (abs > Math.PI/2) {
+      if (vel) AIboost = abs>Math.PI/2-0.4 ? vel>0?-1:1 : 0;
+      AIrotate = stableAng > 0 ? -1 : 1;
+    }
+    else {
+      if (vel) AIboost = abs<0.4 ? vel<0?-1:1 : 0;
+      AIrotate = stableAng < 0 ? -1 : 1;
+    }
   }
+
+  // take actions to move and stabilize to a point
+  function moveToPoint (p, minDist) {
+    var dx = p[0]-spaceship[0];
+    var dy = p[1]-spaceship[1];
+    if (dx*dx+dy*dy<minDist*minDist) return;
+    var tx = dx / 800;
+    var ty = dy / 800;
+    var x = tx - spaceship[2];
+    var y = ty - spaceship[3];
+    var ang = Math.atan2(y, x);
+    var dist = length([x, y]);
+    move(ang, dist);
+  }
+
+  function dot (a,b) { // dot product
+    return a[0]*b[0] + a[1]*b[1];
+  }
+
+  // a line defined by AB, point is P
+  function projectPointToLine (p, a, ab) {
+    var ap = [ p[0]-a[0], p[1]-a[1] ];
+    var k = dot(ap,ab)/dot(ab,ab);
+    return [
+      a[0] + k * ab[0],
+      a[1] + k * ab[1]
+    ];
+  }
+
+  function moveAwayFromPoint (p, v) {
+    var spaceshipToP = [
+      p[0] - spaceship[0],
+      p[1] - spaceship[1]
+    ];
+    var ang = Math.atan2(spaceshipToP[1], spaceshipToP[0]);
+    var dist = length(spaceshipToP);
+    // DEBUG && addPolarDebug(p, ang, 0.5);
+
+    if (v && vel > 0.003 * dist && Math.abs(normAngle(ang - velAng))<Math.PI/3) {
+      // if there is some velocity, it is still good to "traverse" the point and not brake
+      // but we need to target a bit more far from the obj vel
+      var l = length(v);
+      spaceshipToP[0] += 100 * v[0]/l;
+      spaceshipToP[1] += 100 * v[1]/l;
+      ang = Math.atan2(spaceshipToP[1], spaceshipToP[0]);
+      move(ang, 1);
+    }
+    else {
+      move(ang, -1);
+    }
+  }
+
+  // danger have [ x, y, rot, vel ]
+  function moveAwayFromAsteroid (ast) {
+    var v = [
+      ast[3] * Math.cos(ast[2]),// - spaceshipVel[0],
+      ast[3] * Math.sin(ast[2])// - spaceshipVel[1]
+    ];
+    var p = projectPointToLine(spaceship, ast, v);
+    var acceptDist = 30 + 10 * ast[5];
+    var d = dist(p, spaceship);
+    if (d > acceptDist) return;
+    //DEBUG && addDebug(p, v);
+    moveAwayFromPoint(p, v);
+  }
+
+  function predictShootIntersection (bulletVel, pos, target, targetVel) {
+    // http://gamedev.stackexchange.com/a/25292
+    var totarget = [
+      target[0] - pos[0],
+      target[1] - pos[1]
+    ];
+    var a = dot(targetVel, targetVel) - bulletVel * bulletVel;
+    var b = 2 * dot(targetVel, totarget);
+    var c = dot(totarget, totarget);
+    var p = -b / (2 * a);
+    var q = Math.sqrt((b * b) - 4 * a * c) / (2 * a);
+    var t1 = p - q;
+    var t2 = p + q;
+    var t = t1 > t2 && t2 > 0 ? t2 : t1;
+
+    return [t, [
+      target[0] + targetVel[0] * t,
+      target[1] + targetVel[1] * t
+    ]];
+  }
+
+  var middle = [W/2,H/2];
+
+  var closestAsteroid, targetShoot, danger = 0;
+  var closestAsteroidScore = 0.3, targetShootScore = 0.1;
+  var incomingBullet, incomingBulletScore = 0;
 
   for (i = 0; i < asteroids.length; ++i) {
-    var a = asteroids[i];
-    if (!(a[0]<0 || a[1]<0 || a[0]>W || a[1]>H)) {
-      var aPred = [].concat(a);
-      aPred[0] += Math.cos(a[2]) * a[3] * pred;
-      aPred[1] += Math.sin(a[2]) * a[3] * pred;
-      var curDist = dist(a, spaceship) - (10 + 10 * a[5]);
-      var predDist = dist(aPred, predSpaceship) - (10 + 10 * a[5]);
-      if (curDist - predDist > pred / 200 && // approaching
-        (curDist < 80 || predDist < 30 + 30 * q2)) {
-        // imminent collision
-        if (!closestAsteroid || predDist < closestAsteroidPredDist) {
-          closestAsteroid = a;
-          targetAsteroid = a;
-          closestAsteroidPredDist = predDist;
-          danger ++;
-        }
+    var ast = asteroids[i];
+    // FIXME: take velocity of spaceship into account?
+    var v = [
+      ast[3] * Math.cos(ast[2]),
+      ast[3] * Math.sin(ast[2])
+    ];
+    var timeBeforeImpact = dot([ spaceship[0]-ast[0], spaceship[1]-ast[1] ],v)/dot(v,v);
+    var impact = [
+      ast[0] + timeBeforeImpact * v[0],
+      ast[1] + timeBeforeImpact * v[1]
+    ];
+    var distToImpact = dist(spaceship, impact);
+    var distWithSize = distToImpact - 10 - 10 * ast[5];
+
+    var score =
+      Math.exp(-distWithSize/40) +
+      Math.exp(-distWithSize/120) +
+      timeBeforeImpact > 0 ? Math.exp(-timeBeforeImpact/1000) : 0;
+
+    if (score > closestAsteroidScore) {
+      closestAsteroidScore = score;
+      closestAsteroid = ast;
+      danger ++;
+    }
+
+    score =
+      Math.exp(-(ast[5]-1)) *
+      Math.exp(-distWithSize/200);
+
+    if (score > targetShootScore) {
+      var res = predictShootIntersection(0.3, spaceship, ast, v);
+      var t = res[0];
+      var p = res[1];
+      if (0<p[0] && p[0]<W && 0<p[1] && p[1]<H && t<800) {
+        targetShoot = p;
+        targetShootScore = score;
+        //DEBUG && addDebugCircle(p, score, 20);
       }
     }
 
-    if (!(a[5] > 2 && curDist < 30) || predDist < 100) {
-      var w = a[5];
-      if (!closestAsteroid || w < targetAsteroidWeight) {
-        targetAsteroid = aPred;
-        targetAsteroidWeight = w;
-      }
+  }
+
+  for (i = 0; i < bullets.length; ++i) {
+    var b = bullets[i];
+    v = b.slice(2);
+    timeBeforeImpact = dot([ spaceship[0]-b[0], spaceship[1]-b[1] ],v)/dot(v,v);
+    impact = [
+      b[0] + timeBeforeImpact * v[0],
+      b[1] + timeBeforeImpact * v[1]
+    ];
+    distToImpact = dist(spaceship, impact);
+    score = Math.exp(-timeBeforeImpact/1000) + 2*Math.exp(-distToImpact/50);
+    if (100 < timeBeforeImpact &&
+      timeBeforeImpact < 1000 &&
+      distToImpact < 40 &&
+      score > incomingBulletScore) {
+      incomingBulletScore = score;
+      incomingBullet = impact;
     }
   }
 
   for (i = 0; i < ufos.length; ++i) {
     var u = ufos[i];
-    if (Math.random() < 0.02 * dt * (q1+q2+1)) {
-      targetAsteroid = u;
-    }
-  }
-
-  // utility
-
-  function opp (dx, dy) { // going opposite of a vector based on current head direction
-    return (ax > ay) ?
-      ((ax<0)==(dx<0) ? -1 : 1) :
-      ((ay<0)==(dy<0) ? -1 : 1);
+    res = predictShootIntersection(0.3, spaceship, u, u.slice(2));
+    t = res[0];
+    p = res[1];
+    targetShoot = p;
   }
 
   AIexcitement =
@@ -107,64 +281,48 @@ function aiLogic (q1, q2) { // set the 3 AI inputs (rotate, shoot, boost)
   // Now we implement the spaceship reaction
   // From the least to the most important reactions
 
+  // Dump random changes
 
-  // Random changes
+  AIshoot = playingSince > 3000 && Math.random() < 0.001*dt*(1-smart);
 
-  AIshoot = playingSince > 3000 && Math.random() < 0.0001*dt*AIexcitement;
+  AIrotate = (playingSince > 1000 && Math.random()<0.002*dt) ?
+    (Math.random()<0.6 ? 0 : Math.random() < 0.5 ? -1 : 1) : AIrotate;
 
-  AIrotate = (playingSince > 1000 && Math.random()<0.005*dt) ?
-    (Math.random()<0.5 ? 0 : Math.random()<0.5 ? 1 : -1) :
-    prevRot;
+  AIboost = (playingSince > 2000 && Math.random()<0.004*dt) ?
+    (Math.random()<0.7 ? 0 : Math.random() < 0.5 ? -1 : 1) : AIboost;
 
-  AIboost = (playingSince > 2000 && Math.random()<0.005*dt*(1-q1)) ?
-    (Math.random()<0.5 ? 1 : -1) :
-    prevBoost;
+  // Stay in center area
 
+  if (0.1 + smart > Math.random()) moveToPoint(middle, 30);
 
-  // trying to avoid edges
+  // Shot the target
 
-  if (distMiddle > 100 - 80 * q2) {
-    ang = normAngle(angMiddle-spaceship[4]);
-    if (Math.abs(ang) > 2*Math.PI/3) {
-      AIboost = -1;
-    }
-    else if (Math.abs(ang) > Math.PI/3) {
-      AIrotate = ang<0 ? -1 : 1;
+  if (smart > Math.random()) {
+    if (targetShoot) {
+      AIshoot =
+        Math.abs(orient(Math.atan2(
+          targetShoot[1] - spaceship[1],
+          targetShoot[0] - spaceship[0]))) < 0.1 &&
+        Math.random() < 0.04 * dt;
+      targetShootMemory = targetShoot;
+      targetShootMemoryT = t;
     }
     else {
-      AIboost = 1;
+      AIshoot = 0;
     }
   }
 
-  if (Math.random()<0.1 && vel < 0.1) {
-  // minimal move
-    AIboost = 1;
-  }
-  // Slowing down
-  else if (
-    -Math.exp(-distMiddle/80) + // slow down if middle
-    Math.exp(-vel) + // slow down if velocity
-    (1-2*q1) * AIexcitement * Math.random() // excitement make it not slowing down
-    < Math.random()) {
-    AIboost = opp(spaceship[2], spaceship[3]);
+  // Avoid dangers
+  if (smart > Math.random()) {
+    if (closestAsteroid) {
+      moveAwayFromAsteroid(closestAsteroid);
+      closestAsteroidMemory = closestAsteroid;
+      closestAsteroidMemoryT = closestAsteroid;
+    }
+
+    if (incomingBullet) moveAwayFromPoint(incomingBullet);
   }
 
-  if (closestAsteroid && q1>Math.random()-0.02*dt) {
-    x = closestAsteroid[0]-spaceship[0];
-    y = closestAsteroid[1]-spaceship[1];
-    AIboost = opp(x, y);
-    closestAsteroidMemory = closestAsteroid;
-    closestAsteroidMemoryT = t;
-  }
-
-  if (targetAsteroid && q2>Math.random()-0.01*dt) {
-    x = targetAsteroid[0]-spaceship[0];
-    y = targetAsteroid[1]-spaceship[1];
-    ang = normAngle(Math.atan2(y, x)-spaceship[4]);
-    var angabs = Math.abs(ang);
-    if (Math.random() < 0.06*dt*angabs) AIrotate = ang > 0 ? 1 : -1;
-    AIshoot = Math.random() < 0.005 * dt * (Math.exp(-angabs*10) + AIexcitement + q1);
-    targetAsteroidMemory = targetAsteroid;
-    targetAsteroidMemoryT = t;
-  }
+  //DEBUG && targetShoot && addPolarDebug(targetShoot, 0, 0);
+  //DEBUG && closestAsteroid && addPolarDebug(closestAsteroid, closestAsteroid[2], closestAsteroid[3]);
 }

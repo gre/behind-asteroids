@@ -45,7 +45,7 @@ function onTap (e) {
     }
   }
   else if (awaitingContinue) {
-    if (playingSince>0 && 140<y && y<280) {
+    if (playingSince>0 && 170<y && y<310) {
       // continue game action
       if (x<W/2) { // YES
         player = awaitingContinue-1;

@@ -8,7 +8,7 @@ function applyUFOlogic (o) {
     o[4] = 500 + 300 * Math.random();
     if (!dying) {
       var target = Math.atan2(spaceship[1] - o[1], spaceship[0] - o[0]);
-      if (Math.random()<0.2) {
+      if (!o[2] || Math.random()<0.2) {
         var randomAngle = 2*Math.PI*Math.random();
         o[2] = 0.08 * Math.cos(randomAngle);
         o[3] = 0.08 * Math.sin(randomAngle);

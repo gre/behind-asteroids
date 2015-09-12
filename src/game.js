@@ -20,19 +20,27 @@ if (DEBUG) {
   addEventListener("resize", function () {
     playingSince = -1;
     awaitingContinue = 0;
-    player += 1;
+    player += 2;
     incomingObjects = [];
     console.log("player=", player);
+/*
+    ufos.push([
+      0, 0, 0, 0, 0
+    ]);
+    */
+
   });
 
   // Debug the incomingObjects
-  /*
+
+/*
   setInterval(function () {
     createInc();
     if (incomingObjects[0]) sendAsteroid(incomingObjects[0]);
     incomingObjects.splice(0, 1);
-  }, 100);
-  */
+  }, 800);
+*/
+
   /* eslint-enable */
 }
 
@@ -69,12 +77,16 @@ function render (_t) {
 
   ctx.translate(GAME_MARGIN, GAME_Y_MARGIN);
 
+  //if (DEBUG) drawAIDebug();
+
   incomingObjects.forEach(function (inc) {
     ctx.save();
     translateTo(incPosition(inc));
     drawInc(inc);
     ctx.restore();
   });
+
+  drawIncHelp();
 
   ctx.restore();
 
@@ -117,7 +129,7 @@ function update () {
 
     if (!dying && playingSince>0 && t-musicPaused>5000 && player > 2 && !ufos.length) {
 
-      combosTarget = Math.floor(40 - 35 * Math.exp(-(player-3)/14));
+      combosTarget = Math.floor(30 - 25 * Math.exp(-(player-3)/15));
       var musicFreq = 3*combos/combosTarget;
       if (combos > combosTarget) {
         musicPaused = t;
@@ -292,25 +304,20 @@ function update () {
       var ax = Math.cos(spaceship[4]);
       var ay = Math.sin(spaceship[4]);
 
-      var quality = Math.min(0.5, player/8) +
-        1-Math.exp((1-player)/4) +
-        1-Math.exp((1-player)/8);
-      var rep = Math.random();
-      var mix = Math.exp((1-player)/16);
-      rep = rep * mix + 0.5 * (1-mix);
-      var q1 = Math.min(1, rep * quality);
-      var q2 = quality - q1;
-
       // ai logic (determine the 3 inputs)
-      aiLogic(q1, q2);
+      aiLogic(1-Math.exp(-(player-0.8)/14));
 
       // apply ai inputs with game logic
 
-      spaceship[2] += AIboost * dt * 0.0002 * ax;
-      spaceship[3] += AIboost * dt * 0.0002 * ay;
-      spaceship[4] = normAngle(spaceship[4] + AIrotate * dt * 0.005);
+      var rotSpeed = 0.004 + 0.003 * (1-Math.exp(-player/40));
+      var accSpeed = 0.0003 - 0.0002 * Math.exp(-(player-1)/5) + 0.00001 * player;
+      var shotRate = 100 + 1000 * Math.exp(-(player-1)/8) + 300 * Math.exp(-player/20);
+
+      spaceship[2] += AIboost * dt * accSpeed * ax;
+      spaceship[3] += AIboost * dt * accSpeed * ay;
+      spaceship[4] = normAngle(spaceship[4] + AIrotate * dt * rotSpeed);
       if (nbSpaceshipBullets < 3) {
-        if (AIshoot && t-lastBulletShoot > 300) {
+        if (AIshoot && t-lastBulletShoot > shotRate) {
           lastBulletShoot = t;
           play(Ashot);
           shoot(spaceship, 0.3, spaceship[4]);

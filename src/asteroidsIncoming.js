@@ -1,6 +1,6 @@
 /* global
 GAME_INC_PADDING W H t dt borderLength spaceship incomingObjects player
-playingSince randomAsteroidShape lifes dying ctx path MOBILE font
+playingSince randomAsteroidShape lifes dying ctx path MOBILE font helpVisible
 */
 
 function incPosition (o) {
@@ -239,8 +239,23 @@ function drawInc (o) {
 
   if (!MOBILE && playingSince>0) {
     ctx.save();
+    if (helpVisible()) {
+      ctx.strokeStyle = "#f7c";
+    }
     ctx.translate(sum[0]/o[5].length+1, sum[1]/o[5].length-5);
     font(String.fromCharCode(o[7]), 1);
     ctx.restore();
   }
+}
+
+function drawIncHelp () {
+  if (!helpVisible()) return;
+  ctx.strokeStyle = "#f7c";
+  ctx.lineWidth = 4;
+  incomingObjects.forEach(function (o) {
+    var p = incPosition(o);
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], 80 + 40 * Math.cos(0.005 * t), 0, 2*Math.PI);
+    ctx.stroke();
+  });
 }

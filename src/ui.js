@@ -1,7 +1,7 @@
 /* global
 ctx path font gameOver W H player playingSince:true awaitingContinue scoreTxt
 lifes dying MOBILE best score t UFO neverPlayed lastExtraLife neverUFOs dt play
-Amsg GAME_MARGIN FW FH combos achievements musicTick */
+Amsg GAME_MARGIN FW FH combos achievements musicTick helpVisible */
 
 // IN GAME UI
 
@@ -70,6 +70,12 @@ function drawGameUI () {
     ctx.restore();
 
     ctx.save();
+    ctx.translate(50, 70);
+    if ((!awaitingContinue || playingSince>0) && t%1000<500)
+      font("PLAYER "+(awaitingContinue||player+1), 2, 1);
+    ctx.restore();
+
+    ctx.save();
     ctx.translate(W/2 - 160, 0.7*H);
     path([
       [0,2],
@@ -112,17 +118,18 @@ function drawGameUI () {
   }
   if (!gameOver && awaitingContinue && playingSince > 0) {
     ctx.save();
-    ctx.translate(W/2, 100);
-    font("CONTINUE GAME ?", 2);
+    ctx.globalAlpha = 1;
+    ctx.translate(W/2, 140);
+    font("CONTINUE ?", 3);
     ctx.restore();
     ctx.save();
     ctx.globalAlpha = 1;
-    ctx.translate(W/4, 180);
+    ctx.translate(W/4, 210);
     font("YES", MOBILE ? 4 : 6);
     ctx.restore();
     ctx.save();
     ctx.globalAlpha = 1;
-    ctx.translate(3*W/4, 180);
+    ctx.translate(3*W/4, 210);
     font("NO", MOBILE ? 4 : 6);
     ctx.restore();
   }
@@ -297,8 +304,8 @@ function drawUI () {
       }
       else {
         if (neverPlayed) {
-          if (playingSince>10000) {
-            currentMessageClr = currentMessageClr2 = "#7cf";
+          if (helpVisible()) {
+            currentMessageClr = currentMessageClr2 = "#f7c";
             currentMessage = MOBILE ? "TAP ON ASTEROIDS" : "PRESS ASTEROIDS LETTER";
             currentMessage2 = "TO SEND THEM TO THE GAME";
           }
@@ -379,7 +386,7 @@ function drawUI () {
   ctx.save();
   ctx.globalAlpha = musicTick ? 1 : 0.6;
   ctx.strokeStyle = "#7cf";
-  ctx.translate(FW - GAME_MARGIN, FH - 20);
+  ctx.translate(FW - GAME_MARGIN, FH - 30);
   if (combos) font(combos+"x", 1.5, -1);
   ctx.restore();
 

@@ -49,3 +49,10 @@ var t = 0, dt,
 
   // variables related to setup
   gameScale;
+
+
+function helpVisible () {
+  return neverPlayed &&
+    incomingObjects.length &&
+    playingSince>8000;
+}
