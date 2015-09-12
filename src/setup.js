@@ -34,7 +34,7 @@ g.height = c.height = H;
 c.style.top = GAME_Y_MARGIN + "px";
 c.style.left = GAME_MARGIN + "px";
 
-var uiScale = MOBILE ? 1 : devicePixelRatio; // MOBILE is just too slow to do devicePixelRatio..
+var uiScale = devicePixelRatio;
 u.width = FW * uiScale;
 u.height = FH * uiScale;
 u.style.width = FW + "px";
