@@ -238,13 +238,11 @@ function drawInc (o) {
   });
 
   if (!MOBILE && playingSince>0) {
-    ctx.save();
     if (helpVisible()) {
       ctx.strokeStyle = "#f7c";
     }
     ctx.translate(sum[0]/o[5].length+1, sum[1]/o[5].length-5);
     font(String.fromCharCode(o[7]), 1);
-    ctx.restore();
   }
 }
 

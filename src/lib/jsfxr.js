@@ -57,14 +57,14 @@ function SfxrParams() {
    *                x: masterVolume
    * @return If the string successfully parsed
    */
-  this.setSettings = function(values)
+  this.ss = function(values)
   {
     for ( var i = 0; i < 24; i++ )
     {
       this[String.fromCharCode( 97 + i )] = values[i] || 0;
     }
 
-    // I moved this here from the reset(true) function
+    // I moved this here from the r(true) function
     if (this['c'] < .01) {
       this['c'] = .01;
     }
@@ -108,7 +108,7 @@ function SfxrSynth() {
   //
   //--------------------------------------------------------------------------
 
-  this._params = new SfxrParams();  // Params instance
+  this._p = new SfxrParams();  // Params instance
 
   //--------------------------------------------------------------------------
   //
@@ -140,12 +140,12 @@ function SfxrSynth() {
   //--------------------------------------------------------------------------
 
   /**
-   * Resets the runing variables from the params
-   * Used once at the start (total reset) and for the repeat effect (partial reset)
+   * rs the runing variables from the params
+   * Used once at the start (total r) and for the repeat effect (partial r)
    */
-  this.reset = function() {
+  this.r = function() {
     // Shorter reference
-    var p = this._params;
+    var p = this._p;
 
     _period       = 100 / (p['f'] * p['f'] + .001);
     _maxPeriod    = 100 / (p['g']   * p['g']   + .001);
@@ -163,12 +163,12 @@ function SfxrSynth() {
     _changeLimit  = p['m'] == 1 ? 0 : (1 - p['m']) * (1 - p['m']) * 20000 + 32;
   }
 
-  // I split the reset() function into two functions for better readability
-  this.totalReset = function() {
-    this.reset();
+  // I split the r() function into two functions for better readability
+  this.tr = function() {
+    this.r();
 
     // Shorter reference
-    var p = this._params;
+    var p = this._p;
 
     // Calculating the length is all that remained here, everything else moved somewhere
     _envelopeLength0 = p['b']  * p['b']  * 100000;
@@ -184,9 +184,9 @@ function SfxrSynth() {
    * @param buffer A ByteArray to write the wave to
    * @return If the wave is finished
    */
-  this.synthWave = function(buffer, length) {
+  this.sw = function(buffer, length) {
     // Shorter reference
-    var p = this._params;
+    var p = this._p;
 
     // If the filters are active
     var _filters = p['s'] != 1 || p['v'],
@@ -210,7 +210,7 @@ function SfxrSynth() {
         _phaserDeltaOffset = p['r'] * p['r'] * p['r'] * .2,
         // Phase offset for phaser effect
         _phaserOffset = p['q'] * p['q'] * (p['q'] < 0 ? -1020 : 1020),
-        // Once the time reaches this limit, some of the    iables are reset
+        // Once the time reaches this limit, some of the    iables are r
         _repeatLimit = p['p'] ? ((1 - p['p']) * (1 - p['p']) * 20000 | 0) + 32 : 0,
         // The punch factor (louder at begining of sustain)
         _sustainPunch = p['d'],
@@ -267,11 +267,11 @@ function SfxrSynth() {
         return i;
       }
 
-      // Repeats every _repeatLimit times, partially resetting the sound parameters
+      // Repeats every _repeatLimit times, partially rting the sound parameters
       if (_repeatLimit) {
         if (++_repeatTime >= _repeatLimit) {
           _repeatTime = 0;
-          this.reset();
+          this.r();
         }
       }
 
@@ -450,14 +450,14 @@ function SfxrSynth() {
 // Adapted from http://codebase.es/riffwave/
 var synth = new SfxrSynth();
 // Export for the Closure Compiler
-jsfxr = function(settings, audioCtx, cb) {
+function jsfxr (settings, audioCtx, cb) {
   // Initialize SfxrParams
-  synth._params.setSettings(settings);
+  synth._p.ss(settings);
   // Synthesize Wave
-  var envelopeFullLength = synth.totalReset();
+  var envelopeFullLength = synth.tr();
   var data = new Uint8Array(((envelopeFullLength + 1) / 2 | 0) * 4 + 44);
 
-  var used = synth.synthWave(new Uint16Array(data.buffer, 44), envelopeFullLength) * 2;
+  var used = synth.sw(new Uint16Array(data.buffer, 44), envelopeFullLength) * 2;
 
   var dv = new Uint32Array(data.buffer, 0, 44);
   // Initialize header

@@ -14,8 +14,7 @@ function polarPhysics (obj) {
 }
 
 function destroyOutOfBox (obj, i, arr) {
-  var B = 100;
-  if (obj[0] < -B || obj[1] < -B || obj[0] > W+B || obj[1] > H+B) {
+  if (obj[0] < -100 || obj[1] < -100 || obj[0] > W+100 || obj[1] > H+100) {
     arr.splice(i, 1);
   }
 }

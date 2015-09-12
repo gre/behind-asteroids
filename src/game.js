@@ -123,7 +123,7 @@ function update () {
 
   if (t-ufoMusicTime>1200) {
     ufoMusicTime = t;
-    if (ufos.length)
+    if (ufos[0])
       play(Aufo);
   }
 
@@ -249,7 +249,7 @@ function update () {
         incomingObjects = [];
         ufos = [];
         randomAsteroids();
-        delete localStorage.ba_pl;
+        localStorage.ba_pl=0;
       }
     }
 
