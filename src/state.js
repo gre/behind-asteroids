@@ -48,11 +48,11 @@ var t = 0, dt,
   // achievements: [nbAsteroids, nbKills, nbUfos]
   achievements,
 
-  lastScoreIncrement = -9999,
-  lastJump = -9999,
-  lastBulletShoot = -9999,
-  lastExtraLife = -9999,
-  lastLoseShot = -9999,
+  lastScoreIncrement = 0,
+  lastJump = 0,
+  lastBulletShoot = 0,
+  lastExtraLife = 0,
+  lastLoseShot = 0,
 
   // Input state : updated by user events, handled & emptied by the update loop
   keys = {},
@@ -64,6 +64,6 @@ var t = 0, dt,
 
 function helpVisible () {
   return neverPlayed &&
-    incomingObjects.length &&
+    incomingObjects[0] &&
     playingSince>8000;
 }

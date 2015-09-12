@@ -28,7 +28,7 @@ function onTap (e) {
   if (gameOver) {
     if(280 < y && y < 400) {
       if (W/2 - 180 < x && x < W/2 - 20) {
-        open("https://twitter.com/intent/tweet?hashtags=behindasteroids&via=greweb&url="+
+        open("https://twitter.com/intent/tweet?via=greweb&url="+
         encodeURIComponent(location.href)+
         "&text="+
         encodeURIComponent(
