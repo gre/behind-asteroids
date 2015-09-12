@@ -6,6 +6,8 @@ uniform float pt; // playing since time
 uniform float pl; // player number
 uniform float S; // Seed
 uniform float ex; // excitement
+uniform float J; // jump
+uniform float P; // playing
 
 float disc (vec2 c, vec2 r) {
   return step(length((uv - c) / r), 1.0);
@@ -41,12 +43,14 @@ vec4 player (float p, float dx) {
   float walk = step(dx, -0.01) + step(0.01, dx);
   float play = (1.0 - walk) * step(0.0, pt);
   vec2 pos = vec2(0.5) +
+  // jumping cycle
+  J * vec2(0.0, 0.2) +
   // walking cycle
   walk * vec2(
     0.03 * cos(4.0*pt + sin(pt)),
     0.05 * abs(sin(3.0*pt))) +
   // playing cycle
-  e * play * vec2(
+  e * play * (1.0 - P) * vec2(
     0.05 * cos(pt * (1.0 + 0.1 * sin(pt))),
     0.05 * abs(sin(pt)));
   vec2 pos2 = mix(pos, vec2(0.5), 0.5);
@@ -68,12 +72,12 @@ vec4 player (float p, float dx) {
   // left hand
   c += play * (hair + skin) * disc(pos2 - vec2(
     -0.2 + 0.01 * cos(5.0*pt),
-    0.45 - 0.1 * e.y * step(0.0, pt) * pow(abs(sin(8.0 * pt * (1.0 + 0.2 * cos(pt)))), 4.0)
+    0.45 - 0.1 * e.y * step(0.0, pt) * P * pow(abs(sin(8.0 * pt * (1.0 + 0.2 * cos(pt)))), 4.0)
   ), vec2(0.055, 0.05));
   // right hand
   c += play * (hair + skin) * disc(pos2 - vec2(
     0.2 + 0.01 * cos(5.0*pt),
-    0.45 - 0.1 * e.x * step(2.0, pt) * pow(abs(cos(7.0 * pt)), 4.0)
+    0.45 - 0.1 * e.x * step(2.0, pt) * P * pow(abs(cos(7.0 * pt)), 4.0)
   ), vec2(0.055, 0.05));
   // neck
   c += step(c.a, 0.0) * (hair + skin) *
