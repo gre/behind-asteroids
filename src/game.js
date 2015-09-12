@@ -249,6 +249,7 @@ function update () {
         incomingObjects = [];
         ufos = [];
         randomAsteroids();
+        delete localStorage.ba_pl;
       }
     }
 

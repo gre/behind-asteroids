@@ -332,7 +332,7 @@ function drawUI () {
           currentMessage2 = "RED AIMING";
         }
         else if (player==4 && 5000<playingSince && neverUFOs) {
-          currentMessageClr = currentMessageClr2 = "#f66";
+          currentMessageClr = currentMessageClr2 = "#f7c";
           currentMessage = "MAKE COMBOS TO SEND";
           currentMessage2 = "AN UFO !!!";
         }
@@ -355,7 +355,8 @@ function drawUI () {
     }
   }
 
-  if (currentMessage2 && lastMessage2 !== currentMessage2 && currentMessageClr2 === "#f66") {
+  if (currentMessage2 && lastMessage2 !== currentMessage2 &&
+    (currentMessageClr2 == "#f66" || currentMessageClr2 == "#f7c")) {
     play(Amsg);
   }
 
