@@ -40,6 +40,7 @@ and get harder and harder to use:
 <img src="screenshots/ufo.png" width="360" />
 <img src="screenshots/player24.png" width="360" />
 <img src="screenshots/playerlose2.png" width="360" />
+<img src="screenshots/explosion.png" width="360" />
 
 ### Game Over
 
