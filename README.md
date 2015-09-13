@@ -108,7 +108,7 @@ Glare is obtained by applying a large linear blur on the blue channel (= bullets
 
 ![](screenshots/tech/result.png)
 
-The combine the final result, 5 textures are used:
+To combine the final result, 5 textures are used:
 
 ```glsl
 uniform sampler2D G; // game
@@ -118,8 +118,8 @@ uniform sampler2D L; // glare
 uniform sampler2D E; // env (player)
 ```
 
-The blur texture is used as a way to make the blue glowing.
-the persistence stores the previous blur texture to accumulate motion blur over time.
+The blur texture is used as a way to make the glowing effect (multiplying with a blue color).
+The persistence texture stores the previous blur texture to accumulate motion blur over time.
 
 ## Build system
 
