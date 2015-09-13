@@ -82,7 +82,7 @@ Game is saved every time a player entered and can be continued later.
 
 > Here is an non exhaustive summary of what's going on with the WebGL post-processing effects.
 
-### primitives are down on a Canvas
+### primitives are drown on a simple [2D Canvas](http://www.w3.org/TR/2dcontext/)
 using the 3 color channels (RED, GREEN, BLUE) independently (to split object to process by the pipeline).
 
 ![](screenshots/tech/game.png)
