@@ -57,7 +57,8 @@ and get harder and harder to use:
 Everytime the player is reaching 10'000 points, he wins a new extra life,
 You lose if player reaches 5 lifes.
 
-<img src="screenshots/danger1.png" width="360" /><img src="screenshots/gameover.png" width="360" />
+<img src="screenshots/danger1.png" width="360" />
+<img src="screenshots/gameover.png" width="360" />
 
 ### Continue
 
@@ -81,15 +82,13 @@ Game is saved every time a player entered and can be continued later.
 ### primitives are down on a Canvas
 using the 3 color channels (RED, GREEN, BLUE) independently (to split object to process by the pipeline).
 
-![](screenshots/tech/canvas.png)
+![](screenshots/tech/game.png)
 
 ### A "laser" shader draws monochrome, extract/accentuate things from channels
 
-<img src="screenshots/tech/game.png" width="360" />
+and then is blurred
 
-and blurred
-
-<img src="screenshots/tech/laser.png" width="360" />
+![](screenshots/tech/laser.png)
 
 ### the player shader is rendered
 The player and it environment (that will be reflected in the screen) is procedurally generated in a shader.
