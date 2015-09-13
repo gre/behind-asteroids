@@ -11,6 +11,15 @@ I can tell you: A greedy evil 25¢ money maker engine.
 
 This is an entry for [js13kGames](http://js13kgames.com/entries/2015). Theme was **"Reversed"**.
 
+### Inspiration
+
+- The Asteroids original Arcade machine [I've discovered in Brooklyn's Barcade](https://twitter.com/greweb/status/631981745638875137).
+- Youtube videos like [this one](https://www.youtube.com/watch?v=w60sfReTsRA).
+
+**Best quote ever**
+> ["Not bad for a 35 years old system. 35 years old. Things don't get better than this. They don't get better than this. Look at this picture, you know what, even HD can't be this clear, crystal clear, razor sharp, wonderful vector graphics. Sorry there is nothing like it. *nothing like it*. What a terrific game."](https://youtu.be/i-x_gPxqEMw?t=4m14s)
+
+
 ## Game versions
 
 The game both works for mobile and desktop but the gameplay varies.
@@ -27,9 +36,10 @@ on an arcade machine. Like in Asteroids game, player have 3 extra lifes.
 The goal is to make the player lose and try to earn as much coins as possible.
 When a player lose, another come and put a new coin in the arcade.
 
-<img src="screenshots/explosion.png" width="360" /><img src="screenshots/dead.png" width="360" />
-
-<img src="screenshots/newplayer.png" width="360" /><img src="screenshots/playerlose.png" width="360" />
+<img src="screenshots/explosion.png" width="360" />
+<img src="screenshots/dead.png" width="360" />
+<img src="screenshots/newplayer.png" width="360" />
+<img src="screenshots/playerlose.png" width="360" />
 
 There are different game mechanism involved, they get introduced in first levels
 and get harder and harder to use:
