@@ -30,7 +30,9 @@ just prefer the mobile version.
 
 On mobile (especially for iOS Safari), please use **Add to Home screen** for better experience.
 
-## The game
+---
+
+# The Game
 
 Behind Asteroids is a game about throwing asteroids to people playing "Asteroids"
 on an arcade machine. Like in Asteroids game, player have 3 extra lifes.
@@ -55,7 +57,7 @@ and get harder and harder to use:
 <img src="screenshots/playerlose2.png" width="360" />
 <img src="screenshots/explosion.png" width="360" />
 
-### Game Over
+## Game Over
 
 Everytime the player is reaching 10'000 points, he wins a new extra life,
 You lose if player reaches 5 lifes.
@@ -63,12 +65,13 @@ You lose if player reaches 5 lifes.
 <img src="screenshots/danger1.png" width="360" />
 <img src="screenshots/gameover.png" width="360" />
 
-### Continue
+## Continue
 
 Game is saved every time a player entered and can be continued later.
 
 <img src="screenshots/continue.png" width="360" />
 
+---
 
 # Tech overview
 
@@ -78,40 +81,52 @@ Game is saved every time a player entered and can be continued later.
 - [Asteroid fonts implemented "by hand"](src/lib/asteroids.font.js)
 - *... (more to describe later)*
 
-## Under the hood of the effects pipeline
+## Making of the post-processing effects pipeline
 
 > Here is an non exhaustive summary of what's going on with the WebGL post-processing effects.
 
-### primitives are drown on a simple [2D Canvas](http://www.w3.org/TR/2dcontext/)
-using the 3 color channels (RED, GREEN, BLUE) independently (to split object to process by the pipeline).
+Because this is a 2D game, a subset of WebGL is used here: we just use 2 triangles that cover the whole surface in order to just focus in writing fragment shaders.
+
+### primitives are down on a simple [2D Canvas](http://www.w3.org/TR/2dcontext/)
+with classical Canvas 2D code but also
+using the 3 color channels (RED, GREEN, BLUE) independently to split objects into different classes...
 
 ![](screenshots/tech/game.png)
 
-### A "laser" shader draws monochrome, extract/accentuate things from channels
+### A [laser shader](src/shaders/laser.frag) draws it to monochrome
 
-and then is blurred
+It sums up the 3 color channels. The **BLUE** channel, used for the bullets, gets accentuated in a factor that depends on the screen position. This intends to recreate the various intensity of a vector monitor.
+
+The result of this shader is also blurred:
 
 ![](screenshots/tech/laser.png)
 
-### the player shader is rendered
+### the [player shader](src/shaders/player.frag) is rendered
 The player and it environment (that will be reflected in the screen) is procedurally generated in a shader.
+
+The shader code is a bit crazy right now probably because of all animations, but the drawing is not so complex: this is just about drawing ovale and [squircle]() shapes and also some gradients for the lightning.
 
 ![](screenshots/tech/player_raw.png)
 
-and blurred (multi-pass)
+We don't directly use this image in the game, it is visually not very realist, but if we **blur it a lot (and even more on X axis)** to recreate a reflection style, it becomes quite interesting:
 
 ![](screenshots/tech/player.png)
 
-### Glare
+The objective is to find an equilibrium between seeing it a bit in background but not too much. Also note that the hands are moving during a game, this is very subtile to see but it is part of the environment.
 
-Glare is obtained by applying a large linear blur on the blue channel (= bullets) of the initial canvas.
-(I have no image for this)
+### a [Glare shader](src/shaders/glare.frag) effects is added
 
-### Result
+Glare is obtained by applying a large directional blur.
+It is only applied on bright objects (basically just bullets).
 
-![](screenshots/tech/result.png)
+![](screenshots/tech/glare.png)
 
-To combine the final result, 5 textures are used:
+
+### Result with some [persistence](src/shaders/persistence.frag)
+
+![](screenshots/tech/persistence.png)
+
+The final [Game shader](src/shaders/game.frag) combines 5 textures:
 
 ```glsl
 uniform sampler2D G; // game
@@ -123,6 +138,91 @@ uniform sampler2D E; // env (player)
 
 The blur texture is used as a way to make the glowing effect (multiplying with a blue color).
 The persistence texture stores the previous blur texture to accumulate motion blur over time.
+
+
+### Finally, we just put the UI canvas on top of the game canvas
+
+![](screenshots/player24.png)
+
+## Feedbacks on developing a JS13K game
+
+### Don't start with JS*K tricks
+
+My first point is about NOT doing any JavaScript tricks to save more bytes until you are at the last days of the competitions and if it happens you actually are >13k (really, 13K zipped is plenty of room for making a game even if not "bytes optimized").
+
+So, you want your game to run first.
+And even if you have a first version, you might improve it, so keeping your code readable and maintainable is very important.
+
+### Don't fear using libraries! (to start with)
+
+Unlike some recommendations I've seen previously about making JS13K games,
+I think you can afford starting with some libraries.
+Just keep in mind to not be too much tied to these libraries so you can eventually remove them.
+
+My point is, the process of making a game is very long and you want to be
+as productive as possible to prototype and add game features.
+
+In my game I've used [stack.gl](http://stack.gl) libraries for making the post processing effects, and I only port my code back to raw WebGL when I was really sure it was done.
+I was very productive working on these effects and was not stuck by crazy code.
+
+When I was sure of the post-processing pipeline, I've then replaced usage of these libraries by [tiny utility functions](src/lib/webgl.js) specific for my needs.
+
+## I have avoided "OO-style" to functional style
+
+There is no "Objects" in my game, I've gone away from the classical prototype / OO way of doing games.
+
+What I've used is just arrays. This is both a technical choice (going more FP) and a way to save more bytes (a minifier can't rename fields of objects, `[0], [1], ...` are obviously saving bytes especially when zipped).
+
+### Array as data structure
+
+So instead of objects, I've used array like a tuple.
+For instance, the `spaceship` state is `[x, y, velx, vely, rot]`
+and `asteroids` state is an array of `[x, y, rot, vel, shape, lvl]`.
+
+All my game state is in [state.js](src/state.js) and "tuple types" are all documented.
+
+Taking this approach, you better have to design your game state first so you don't change this over time (this is the cons of this approach, indexes are not really readable and maintainable).
+
+Also you should try to make your tuple looking like the same so you can share some code for different types (`x, y` is always the 2 first values in my tuples).
+
+### Embrace Functions
+
+Instead of object methods, I just have a lot of functions.
+For instance, I have `drawAsteroid(asteroid)`.
+
+Some functions are generic so you can re-use them for different needs.
+I've found a very nice way of implementing **"behaviors"** of objects:
+
+```js
+// code from the update loop
+euclidPhysics(spaceship);
+asteroids.forEach(polarPhysics);
+ufos.forEach(euclidPhysics);
+bullets.forEach(euclidPhysics);
+particles.forEach(polarPhysics);
+
+ufos.forEach(applyUFOlogic);
+incomingObjects.forEach(applyIncLogic);
+
+particles.forEach(applyLife);
+loopOutOfBox(spaceship);
+asteroids.forEach(
+  // conditional behavior !!
+  playingSince > 0 && !awaitingContinue && !gameOver ?
+  destroyOutOfBox : loopOutOfBox);
+ufos.forEach(loopOutOfBox);
+bullets.forEach(applyLife);
+bullets.forEach(loopOutOfBox);
+```
+
+Also, it is easy to pass function as a value:
+```js
+// code from the render loop
+renderCollection(asteroids, drawAsteroid);
+renderCollection(ufos, drawUFO);
+renderCollection(bullets, drawBullet);
+renderCollection(particles, drawParticle);
+```
 
 ## Build system
 
