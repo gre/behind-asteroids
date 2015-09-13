@@ -37,7 +37,7 @@ and get harder and harder to use:
 - The "RED" area in the aiming that make you fail the throw (Player >3)
 - The UFO bonus that you get after sending asteroids without failing to throw an asteroid (Player >4)
 
-<img src="screenshots/explosion.png" width="400" />
+<img src="screenshots/ufo.png" width="400" />
 <img src="screenshots/player24.png" width="400" />
 <img src="screenshots/playerlose2.png" width="400" />
 
