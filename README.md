@@ -1,4 +1,4 @@
-# Behind Asteroids, The Dark Side [![](https://img.shields.io/badge/js13kGames-2015-b12a34.svg)](http://js13kgames.com/)
+# Behind Asteroids, The Dark Side [![](https://img.shields.io/badge/js13kGames-2015-b12a34.svg)](http://js13kgames.com/entries/behind-asteroids-the-dark-side)
 
 ## Synopsis
 
