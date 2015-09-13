@@ -1,4 +1,4 @@
-# <img src="160x160.png" height=40 /> Behind Asteroids, The Dark Side [![](https://img.shields.io/badge/js13kGames-2015-b12a34.svg)](http://js13kgames.com/)
+# Behind Asteroids, The Dark Side [![](https://img.shields.io/badge/js13kGames-2015-b12a34.svg)](http://js13kgames.com/)
 
 ## Synopsis
 
