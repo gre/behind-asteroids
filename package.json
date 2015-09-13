@@ -13,7 +13,7 @@
     "build-nominify": "npm run clean && npm run compileglsl && npm run concat && npm run nominify && npm run gen",
     "watch": "npm run build-nominify; wr 'npm run build-nominify' src/ scripts/",
     "liveserver": "mkdir -p target; cd target; live-server --no-browser",
-    "zip": "zip -r target.zip target; wc -c target.zip",
+    "zip": "cd target; zip -r ../target.zip .; cd ..; wc -c target.zip",
     "start": "npm run watch & npm run liveserver"
   },
   "repository": {
