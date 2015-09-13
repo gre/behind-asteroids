@@ -1,7 +1,7 @@
 # Behind Asteroids — The Dark Side
 
-Ever wondered what happening under the hood of an Asteroids Arcade machine?
-I can tell you: A greedy 25¢ money maker engine.
+Ever wondered what is happening under the hood of an Asteroids Arcade machine?
+I can tell you: A greedy evil 25¢ money maker engine.
 
 ![](400x250.png)
 
