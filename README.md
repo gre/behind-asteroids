@@ -5,8 +5,6 @@
 Ever wondered what is happening under the hood of an Asteroids Arcade machine?
 I can tell you: A greedy evil 25¢ money maker engine.
 
-![](400x250.png)
-
 ## Context
 
 This is an entry for [js13kGames](http://js13kgames.com/entries/2015). Theme was **"Reversed"**.
