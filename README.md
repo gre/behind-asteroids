@@ -1,6 +1,6 @@
-# Behind Asteroids — The Dark Side
+# Behind Asteroids — The Dark Side [![](https://img.shields.io/badge/js13kGames-2015-b12a34.svg)](http://js13kgames.com/)
 
-[![](https://img.shields.io/badge/js13kGames-2015-b12a34.svg)](http://js13kgames.com/)
+<img src="screenshots/intro.png" width="400" />
 
 ## Synopsis
 
@@ -25,9 +25,9 @@ on an arcade machine. Like in Asteroids game, player have 3 extra lifes.
 The goal is to make the player lose and try to earn as much coins as possible.
 When a player lose, another come and put a new coin in the arcade.
 
-The game gets harder and harder over players as the AI improves.
-The AI starts to be very good around Player 10
-and the game is very challenging from Player 20.
+<img src="screenshots/explosion.png" width="400" /><img src="screenshots/dead.png" width="400" />
+
+<img src="screenshots/newplayer.png" width="400" /><img src="screenshots/playerlose.png" width="400" />
 
 There are different game mechanism involved, they get introduced in first levels
 and get harder and harder to use:
@@ -37,18 +37,31 @@ and get harder and harder to use:
 - The "RED" area in the aiming that make you fail the throw (Player >3)
 - The UFO bonus that you get after sending asteroids without failing to throw an asteroid (Player >4)
 
+<img src="screenshots/explosion.png" width="400" />
+<img src="screenshots/player24.png" width="400" />
+<img src="screenshots/playerlose2.png" width="400" />
+
+### Game Over
+
+Everytime the player is reaching 10'000 points, he wins a new extra life,
+You lose if player reaches 5 lifes.
+
+<img src="screenshots/danger1.png" width="400" /><img src="screenshots/gameover.png" width="400" />
+
 ## Tech overview
 
 - Canvas2D for the game primitives drawing
 - [WebGL](src/lib/webgl.js) for post processing effects (7 fragment shaders)
-- [Web Audio API](src/lib/audio.js) + [jsfxr](src/lib/jsfxr.js)
+- [Web Audio API](src/lib/audio.js) + [jsfxr](src/lib/jsfxr.js) ([14 sounds](src/sounds.js))
 - [Asteroid fonts implemented "by hand"](src/lib/asteroids.font.js)
 - *... (more to describe later)*
 
 ## Build system
 
-The build system is made with a few simple scripts.
-It is able to copy assets, concat all files, minify the GLSL code, minify the JavaScript,...
+The build system is dedicated to JS13K and made with a few simple [scripts](package.json).
+It is able to copy assets, [concat all files](scripts/concat.sh), [minify the GLSL code](scripts/compileglslfiles.sh), minify the JavaScript, zip the result and give size information.
+
+Things are a bit specific to my need but remain very simple, modular and powerful, you could easily fork it.
 
 ### dev
 
