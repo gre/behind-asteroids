@@ -7,7 +7,8 @@ I can tell you: A greedy evil 25¢ money maker engine.
 
 ## Context
 
-This is an entry for [js13kGames](http://js13kgames.com/entries/2015). Theme was **"Reversed"**.
+This is an entry for [js13kGames](http://js13kgames.com/entries/2015), goal is to make a web game in less than 13k zipped of JavaScript.
+Theme was **"Reversed"**.
 
 ### Inspiration
 
