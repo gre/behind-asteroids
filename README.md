@@ -59,13 +59,68 @@ You lose if player reaches 5 lifes.
 
 <img src="screenshots/danger1.png" width="360" /><img src="screenshots/gameover.png" width="360" />
 
-## Tech overview
+### Continue
+
+Game is saved every time a player entered and can be continued later.
+
+<img src="screenshots/continue.png" width="360" />
+
+
+# Tech overview
 
 - Canvas2D for the game primitives drawing
 - [WebGL](src/lib/webgl.js) for post processing effects (7 fragment shaders)
 - [Web Audio API](src/lib/audio.js) + [jsfxr](src/lib/jsfxr.js) ([14 sounds](src/sounds.js))
 - [Asteroid fonts implemented "by hand"](src/lib/asteroids.font.js)
 - *... (more to describe later)*
+
+## Under the hood of the effects pipeline
+
+> Here is an non exhaustive summary of what's going on with the WebGL post-processing effects.
+
+### primitives are down on a Canvas
+using the 3 color channels (RED, GREEN, BLUE) independently (to split object to process by the pipeline).
+
+![](screenshots/tech/canvas.png)
+
+### A "laser" shader draws monochrome, extract/accentuate things from channels
+
+<img src="screenshots/tech/game.png" width="360" />
+
+and blurred
+
+<img src="screenshots/tech/laser.png" width="360" />
+
+### the player shader is rendered
+The player and it environment (that will be reflected in the screen) is procedurally generated in a shader.
+
+![](screenshots/tech/player_raw.png)
+
+and blurred (multi-pass)
+
+![](screenshots/tech/player.png)
+
+### Glare
+
+Glare is obtained by applying a large linear blur on the blue channel (= bullets) of the initial canvas.
+(I have no image for this)
+
+### Result
+
+![](screenshots/tech/result.png)
+
+The combine the final result, 5 textures are used:
+
+```glsl
+uniform sampler2D G; // game
+uniform sampler2D R; // persistence
+uniform sampler2D B; // blur
+uniform sampler2D L; // glare
+uniform sampler2D E; // env (player)
+```
+
+The blur texture is used as a way to make the blue glowing.
+the persistence stores the previous blur texture to accumulate motion blur over time.
 
 ## Build system
 
