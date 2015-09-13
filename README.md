@@ -1,13 +1,15 @@
-# Behind Asteroids — The Dark Side [![](https://img.shields.io/badge/js13kGames-2015-b12a34.svg)](http://js13kgames.com/)
-
-<img src="screenshots/intro.png" width="360" />
+# <img src="160x160.png" height=40 /> Behind Asteroids, The Dark Side [![](https://img.shields.io/badge/js13kGames-2015-b12a34.svg)](http://js13kgames.com/)
 
 ## Synopsis
 
 Ever wondered what is happening under the hood of an Asteroids Arcade machine?
 I can tell you: A greedy evil 25¢ money maker engine.
 
-![](360x250.png)
+![](400x250.png)
+
+## Context
+
+This is an entry for [js13kGames](http://js13kgames.com/entries/2015). Theme was **"Reversed"**.
 
 ## Game versions
 
