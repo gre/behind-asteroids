@@ -20,6 +20,9 @@ Theme was **"Reversed"**.
 **Best quote ever**
 > ["Not bad for a 35 years old system. 35 years old. Things don't get better than this. They don't get better than this. Look at this picture, you know what, even HD can't be this clear, crystal clear, razor sharp, wonderful vector graphics. Sorry there is nothing like it. *nothing like it*. What a terrific game."](https://youtu.be/i-x_gPxqEMw?t=4m14s)
 
+### Special thanks
+
+- [mrspeaker](http://twitter.com/mrspeaker) for his support, testing and English help.
 
 ## Game versions
 
@@ -139,7 +142,6 @@ uniform sampler2D E; // env (player)
 The blur texture is used as a way to make the glowing effect (multiplying with a blue color).
 The persistence texture stores the previous blur texture to accumulate motion blur over time.
 
-
 ### Finally, we just put the UI canvas on top of the game canvas
 
 ![](screenshots/player24.png)
@@ -153,7 +155,7 @@ My first point is about NOT doing any JavaScript tricks to save more bytes until
 So, you want your game to run first.
 And even if you have a first version, you might improve it, so keeping your code readable and maintainable is very important.
 
-### Don't fear using libraries! (to start with)
+### Don't fear beginning with libraries!
 
 Unlike some recommendations I've seen previously about making JS13K games,
 I think you can afford starting with some libraries.
@@ -166,6 +168,16 @@ In my game I've used [stack.gl](http://stack.gl) libraries for making the post p
 I was very productive working on these effects and was not stuck by crazy code.
 
 When I was sure of the post-processing pipeline, I've then replaced usage of these libraries by [tiny utility functions](src/lib/webgl.js) specific for my needs.
+
+## Make your game visually debuggable
+
+When developing a game, especially an AI, it is important to debug.
+And by debug I mean displaying hidden game logic.
+The problem of `console.log`ging things is it is difficult to picture it with the game for a given instant.
+
+You want to see vectors and AI decisions to be able to tweak game parameters and improve the game.
+
+[See in this video one display I've used when debugging the AI](https://www.youtube.com/watch?v=1F5XWY4fGaY)
 
 ## I have avoided "OO-style" to functional style
 
@@ -246,4 +258,3 @@ npm run watch
 ```
 npm run build
 ```
-
