@@ -146,6 +146,12 @@ The persistence texture stores the previous blur texture to accumulate motion bl
 
 ![](screenshots/player24.png)
 
+## Font drawing
+
+![](screenshots/tech/font.png)
+
+[Code is here](src/lib/asteroids.font.js)
+
 ## Feedbacks on developing a JS13K game
 
 ### Don't start with JS*K tricks
