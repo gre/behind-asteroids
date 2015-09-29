@@ -1,4 +1,5 @@
-# Behind Asteroids, The Dark Side [![](https://img.shields.io/badge/js13kGames-2015-b12a34.svg)](http://js13kgames.com/entries/behind-asteroids-the-dark-side)
+# Behind Asteroids, The Dark Side
+[![](https://img.shields.io/badge/js13kGames-2015-b12a34.svg)](http://js13kgames.com/) [![](https://img.shields.io/badge/desktop-%231-yellow.svg)](http://2015.js13kgames.com/#winners)  [![](https://img.shields.io/badge/mobile-%231-yellow.svg)](http://2015.js13kgames.com/#winners-mobile)  [![](https://img.shields.io/badge/community-%231-yellow.svg)](http://2015.js13kgames.com/#winners-community)
 
 [PLAY](http://js13kgames.com/games/behind-asteroids-the-dark-side/index.html) – [entry](http://js13kgames.com/entries/behind-asteroids-the-dark-side)
 
