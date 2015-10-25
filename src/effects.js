@@ -44,6 +44,7 @@ function drawPostProcessing () {
 
   // Player / env
   glBindFBO(playerFbo);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   glBindShader(playerShader);
   gl.uniform1f(glUniformLocation(playerShader, "pt"), playingSince / 1000);
   gl.uniform1f(glUniformLocation(playerShader, "pl"), player);
@@ -51,6 +52,8 @@ function drawPostProcessing () {
   gl.uniform1f(glUniformLocation(playerShader, "J"), jumping);
   gl.uniform1f(glUniformLocation(playerShader, "P"), playingSince<0 || gameOver || dying ? 0 : 1);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+return;
   glBindFBO(fbo1);
   glBindShader(blur1dShader);
   gl.uniform1i(glUniformLocation(blur1dShader, "t"), glBindTexture(glGetFBOTexture(playerFbo), 0));

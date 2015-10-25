@@ -91,7 +91,7 @@ function render (_t) {
   incomingObjects.forEach(function (inc) {
     ctx.save();
     translateTo(incPosition(inc));
-    drawInc(inc);
+    //drawInc(inc);
     ctx.restore();
   });
 
@@ -404,6 +404,33 @@ function drawGame () {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
+
+  return;
+
+  ctx.save();
+
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = "#F00";
+  ctx.lineStyle = 1;
+
+  ctx.translate(60, 20);
+
+  [
+    "ABCDEFGHIJ",
+    "KLMNOPQRST",
+    "UVWXYZ",
+    "0123456789",
+    "ᐃ¢x?!.:''"
+  ].map(function (txt) {
+    ctx.translate(0, 60);
+    ctx.save();
+    font(txt, 4, 1);
+    ctx.restore();
+  });
+
+  ctx.restore();
+
+  return;
 
   renderCollection(asteroids, drawAsteroid);
   renderCollection(ufos, drawUFO);
